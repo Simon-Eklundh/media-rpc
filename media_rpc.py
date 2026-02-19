@@ -11,6 +11,7 @@ DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID" # Need the Application ID, not Bot 
 # 1. Jellyfin Config
 JELLYFIN_SERVER = "https://jellyfin.example.com/Sessions"
 JELLYFIN_API_KEY = "YOUR_JELLYFIN_API_KEY"
+JELLYFIN_USER_ID = "YOUR_JELLYFIN_USER_ID_HERE"
 #JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] - Sample blacklist to hide certain libraries from showing up in RPC.
 JELLYFIN_IGNORE_LIBRARIES = []
 TMDB_API_KEY = "YOUR_TMDB_API_KEY"
@@ -156,7 +157,7 @@ def fetch_jellyfin():
     try:
         res = requests.get(JELLYFIN_SERVER, headers={"X-Emby-Token": JELLYFIN_API_KEY}, timeout=1).json()
         if not res: return None
-        session = next((s for s in res if "NowPlayingItem" in s and not s["PlayState"].get("IsPaused")), None)
+        session = next((s for s in res if "NowPlayingItem" in s and not s["PlayState"].get("IsPaused") and s.get("UserId") == JELLYFIN_USER_ID), None)
         if not session: return None
         base_url = JELLYFIN_SERVER.split("/Sessions")[0]
 
@@ -182,9 +183,11 @@ def fetch_jellyfin():
                             return None
                 else:
                     print(f"[DEBUG] Ancestor Check Failed: {parents_resp.status_code}")
+                    return None
                     
             except Exception as e:
                 print(f"[DEBUG] Blacklist Error: {e}")
+                return None
 
         prog = session["PlayState"].get("PositionTicks", 0) / 10000000
         dur = item.get("RunTimeTicks", 0) / 10000000
