@@ -17,7 +17,7 @@ JELLYFIN_SERVER = os.getenv("JELLYFIN_SERVER")
 JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
 JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
 #JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] # Sample blacklist to hide certain libraries from showing up in RPC.
-JELLYFIN_IGNORE_LIBRARIES = ["Youtube", "Youtube Backups"]
+JELLYFIN_IGNORE_LIBRARIES = []
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # 2. Audiobookshelf Config
@@ -27,6 +27,11 @@ ABS_API_TOKEN = os.getenv("ABS_API_TOKEN")
 # Optional: Imgur Client ID
 IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID") 
 USE_IMGUR = False # Set to False if you don't have a Client ID
+
+# Optional: whether to show client or movie/show/book title on the discord activity field 
+DISCORD_TITLE = os.getenv("DISCORD_TITLE", default = "details") 
+ALLOWED_DISCORD_TITLES = ['details', 'client']
+
 
 # --- STATE MANAGEMENT ---
 abs_state = {
@@ -280,7 +285,9 @@ def fetch_jellyfin():
         dur = item.get("RunTimeTicks", 0) / 10000000
         year = item.get('ProductionYear')
         series = item.get('SeriesName')
-        state_text = f"{series} ({year})" if series else f"{year}" # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        state_text = f"{series} ({year})" if series else f"{year} • StreamNode" # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        
+        # Logic to get client icon in the little area in discord activity details
         client = session.get("Client")
         match client:
             case "AFinity":
@@ -297,9 +304,10 @@ def fetch_jellyfin():
             "start": int(time.time() - prog),
             "end": int(time.time() - prog + dur),
             "cover": get_jellyfin_cover(base_url, item.get("Id"), JELLYFIN_API_KEY, series if series else title, year, item.get('Type')),
-            "text": "Oakgrove",
+            "text": "StreamNode",
             "status": "Playing",
-            "client_image": small_icon
+            "client_image": small_icon,
+            "client": client
         }
     except Exception as e: 
         print(f"[DEBUG] Error: {e}")
@@ -382,10 +390,9 @@ def fetch_abs():
 
         start_ts = int(now - current_time)
         end_ts = int(start_ts + dur)
-        abs_state_text = f"{display_author}" # You should replace "AudioNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        abs_state_text = f"{display_author} • AudioNode" # You should replace "AudioNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        # logic for which client icon to show
         client = session["deviceInfo"].get("clientName")
-        print("client:")
-        print(client)
         match client:
             case "AFinity":
                 icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
@@ -400,7 +407,8 @@ def fetch_abs():
             "cover": cover,
             "text": abs_state_text,
             "status": "Playing",
-            "client_image": icon
+            "client_image": icon,
+            "client": client
         }
     except: return None
 
@@ -425,11 +433,16 @@ def main():
     sock = None
     last_printed = None
 
+    global DISCORD_TITLE
+    print("discord title")
+    print(DISCORD_TITLE)
+    if DISCORD_TITLE not in ALLOWED_DISCORD_TITLES:
+        print("INVALID DISCORD TITLE FOUND. SETTING DETAILS INSTEAD. PLEASE VALIDATE")
+        DISCORD_TITLE = 'details'
     while True:
         if not sock: sock = connect()
 
         data = fetch_jellyfin()
-        
         if not data: 
             data = fetch_abs()
             
@@ -442,12 +455,9 @@ def main():
                 last_printed = activity_key
 
             timestamps = {"start": data['start'], "end": data['end']}
-             # You should replace this with your own small icon, preferably a play icon
-            
+            name = DISCORD_TITLE
             activity = {
-                "name": data["details"],
-                "status_display_type": 2, # 0,1,2
-
+                "name": data[name],
                 "details": data['details'],
                 "state": data['state'],
                 "assets": {
