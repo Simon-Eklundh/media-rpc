@@ -16,7 +16,7 @@ DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 JELLYFIN_SERVER = os.getenv("JELLYFIN_SERVER")
 JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
 JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
-#JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] - Sample blacklist to hide certain libraries from showing up in RPC.
+#JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] # Sample blacklist to hide certain libraries from showing up in RPC.
 JELLYFIN_IGNORE_LIBRARIES = []
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
@@ -37,21 +37,51 @@ abs_state = {
 
 # Cache files
 COVER_CACHE_FILE = "cover_cache.json"
+POSTER_CACHE_FILE = "poster_cache.json"
+LIBRARY_CACHE_FILE = "library_cache.json"
 cover_cache = {}
 poster_cache = {}
 library_cache = {}
 
 # SYSTEM UTILS
-def load_cover_cache():
-    global cover_cache
+def load_caches():
+    global cover_cache, poster_cache, library_cache
     if os.path.exists(COVER_CACHE_FILE):
         try:
             with open(COVER_CACHE_FILE, 'r') as f: cover_cache = json.load(f)
         except: cover_cache = {}
+        
+    if os.path.exists(POSTER_CACHE_FILE):
+        try:
+            with open(POSTER_CACHE_FILE, 'r') as f: poster_cache = json.load(f)
+        except: poster_cache = {}
+        
+    if os.path.exists(LIBRARY_CACHE_FILE):
+        try:
+            with open(LIBRARY_CACHE_FILE, 'r') as f: library_cache = json.load(f)
+        except: library_cache = {}
+
+def enforce_cache_limit(cache_dict, max_size=2000):
+    while len(cache_dict) > max_size:
+        oldest_key = next(iter(cache_dict))
+        del cache_dict[oldest_key]
 
 def save_cover_cache():
+    enforce_cache_limit(cover_cache, max_size=2000)
     try:
         with open(COVER_CACHE_FILE, 'w') as f: json.dump(cover_cache, f)
+    except: pass
+
+def save_poster_cache():
+    enforce_cache_limit(poster_cache, max_size=2000)
+    try:
+        with open(POSTER_CACHE_FILE, 'w') as f: json.dump(poster_cache, f)
+    except: pass
+
+def save_library_cache():
+    enforce_cache_limit(library_cache, max_size=2000)
+    try:
+        with open(LIBRARY_CACHE_FILE, 'w') as f: json.dump(library_cache, f)
     except: pass
 
 def get_ipc_path():
@@ -68,6 +98,29 @@ def send_frame(sock, opcode, payload):
     except Exception as e:
         print(f"[RPC] send_frame error: {e}")
         raise
+
+def drain_recv(sock):
+    try:
+        sock.setblocking(False)
+        while True:
+            header = sock.recv(8)
+            if len(header) < 8:
+                break
+            _, length = struct.unpack("<II", header)
+            if length > 0:
+                remaining = length
+                while remaining > 0:
+                    chunk = sock.recv(min(remaining, 4096))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+    except BlockingIOError:
+        pass
+    except Exception as e:
+        print(f"[RPC] drain_recv error: {e}")
+        raise
+    finally:
+        sock.setblocking(True)
 
 # IMGUR / COVER LOGIC
 def upload_to_imgur(image_data):
@@ -113,6 +166,7 @@ def get_tmdb_poster(title, year, type="movie"):
             path = res['results'][0].get('poster_path')
             img = f"https://images.weserv.nl/?url=https://image.tmdb.org/t/p/w500{path}&w=500&h=500&fit=cover"
             poster_cache[cache_key] = img
+            save_poster_cache()
             return img
     except: pass
     return "https://cdn-icons-png.flaticon.com/512/2699/2699194.png"
@@ -127,16 +181,23 @@ def get_itunes_poster(title, author):
         if res['resultCount'] > 0:
             img = res['results'][0]['artworkUrl100'].replace('100x100bb', '600x600bb')
             poster_cache[cache_key] = img
+            save_poster_cache()
             return img
     except: pass
     return "https://cdn-icons-png.flaticon.com/512/6135/6135126.png"
 
 
 def get_jellyfin_cover(base_url, item_id, api_key, title, year, item_type):
+    cache_key = f"jellyfin_{item_id}"
+    if cache_key in poster_cache:
+        return poster_cache[cache_key]
     try:
         cover_url = f"{base_url}/Items/{item_id}/Images/Primary?fillHeight=500&fillWidth=500&quality=96&api_key={api_key}"
         resp = requests.head(cover_url, timeout=2)
         if resp.status_code == 200:
+            print(f"[Jellyfin Cover] New cover cached for: {item_id}")
+            poster_cache[cache_key] = cover_url
+            save_poster_cache()
             return cover_url
     except Exception as e:
         print(f"[Jellyfin Cover] Error: {e}")
@@ -173,7 +234,7 @@ def fetch_jellyfin():
 
         item = session["NowPlayingItem"]
         title = item.get('Name')
-        if 'JELLYFIN_IGNORE_LIBRARIES' in globals() and JELLYFIN_IGNORE_LIBRARIES:
+        if JELLYFIN_IGNORE_LIBRARIES:
             item_id = item.get("Id")
             
             if item_id in library_cache:
@@ -202,6 +263,7 @@ def fetch_jellyfin():
                                 break
                         
                         library_cache[item_id] = is_safe
+                        save_library_cache()
                         
                         if not is_safe:
                             return None
@@ -249,22 +311,21 @@ def fetch_abs():
         now = time.time()
         
         if abs_state["last_position"] is None:
-            abs_state["is_playing"] = False
             abs_state["last_position"] = current_time
             abs_state["last_api_time"] = now
-            return None 
+            abs_state["is_playing"] = False
 
         last_time = abs_state["last_position"]
         last_api_time = abs_state["last_api_time"]
         elapsed = now - last_api_time
 
-        if elapsed >= 2 and abs(current_time - last_time) < 0.001:
+        if elapsed >= 10 and abs(current_time - last_time) < 1.0:
             abs_state["is_playing"] = False
             abs_state["last_position"] = current_time
             abs_state["last_api_time"] = now
-            return None 
-            
-        elif abs(current_time - last_time) > 0.001:
+            return None
+
+        elif abs(current_time - last_time) >= 1.0:
             abs_state["is_playing"] = True
 
         abs_state["last_position"] = current_time
@@ -334,6 +395,7 @@ def connect():
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(ipc)
             send_frame(sock, 0, {"v": 1, "client_id": DISCORD_CLIENT_ID})
+            drain_recv(sock)
             print(f"Connected to Discord at {ipc}!")
             return sock
         except:
@@ -342,7 +404,7 @@ def connect():
 
 def main():
     print("Starting RPC...")
-    load_cover_cache()
+    load_caches()
     sock = None
     last_printed = None
 
@@ -383,6 +445,7 @@ def main():
 
         try:
             send_frame(sock, 1, payload)
+            drain_recv(sock)
         except:
             print("\nConnection lost. Reconnecting...")
             if sock:
