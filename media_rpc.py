@@ -4,24 +4,28 @@ import time
 import os
 import struct
 import requests
+from dotenv import load_dotenv
+
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(env_path)
 
 # --- CONFIGURATION ---
-DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID" # Need the Application ID, not Bot Token
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 
 # 1. Jellyfin Config
-JELLYFIN_SERVER = "https://jellyfin.example.com/Sessions"
-JELLYFIN_API_KEY = "YOUR_JELLYFIN_API_KEY"
-JELLYFIN_USER_ID = "YOUR_JELLYFIN_USER_ID_HERE"
+JELLYFIN_SERVER = os.getenv("JELLYFIN_SERVER")
+JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
+JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
 #JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] - Sample blacklist to hide certain libraries from showing up in RPC.
 JELLYFIN_IGNORE_LIBRARIES = []
-TMDB_API_KEY = "YOUR_TMDB_API_KEY"
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # 2. Audiobookshelf Config
-ABS_SERVER = "https://abs.example.com"
-ABS_API_TOKEN = "YOUR_ABS_API_TOKEN"
+ABS_SERVER = os.getenv("ABS_SERVER")
+ABS_API_TOKEN = os.getenv("ABS_API_TOKEN")
 
 # Optional: Imgur Client ID
-IMGUR_CLIENT_ID = "YOUR_IMGUR_CLIENT_ID" 
+IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID") 
 USE_IMGUR = False # Set to False if you don't have a Client ID
 
 # --- STATE MANAGEMENT ---
@@ -35,6 +39,7 @@ abs_state = {
 COVER_CACHE_FILE = "cover_cache.json"
 cover_cache = {}
 poster_cache = {}
+library_cache = {}
 
 # SYSTEM UTILS
 def load_cover_cache():
@@ -62,6 +67,7 @@ def send_frame(sock, opcode, payload):
         sock.sendall(header + data)
     except Exception as e:
         print(f"[RPC] send_frame error: {e}")
+        raise
 
 # IMGUR / COVER LOGIC
 def upload_to_imgur(image_data):
@@ -157,37 +163,56 @@ def fetch_jellyfin():
     try:
         res = requests.get(JELLYFIN_SERVER, headers={"X-Emby-Token": JELLYFIN_API_KEY}, timeout=1).json()
         if not res: return None
-        session = next((s for s in res if "NowPlayingItem" in s and not s["PlayState"].get("IsPaused") and s.get("UserId") == JELLYFIN_USER_ID), None)
+        session = next(
+            (s for s in res 
+            if "NowPlayingItem" in s
+            and not s["PlayState"].get("IsPaused")
+            and s.get("UserId") == JELLYFIN_USER_ID), None)
         if not session: return None
         base_url = JELLYFIN_SERVER.split("/Sessions")[0]
 
         item = session["NowPlayingItem"]
         title = item.get('Name')
         if 'JELLYFIN_IGNORE_LIBRARIES' in globals() and JELLYFIN_IGNORE_LIBRARIES:
-            try:
-                user_id = session.get("UserId")
-                item_id = item.get("Id")
-                anc_url = f"{base_url}/Items/{item_id}/Ancestors"
-                parents_resp = requests.get(
-                    anc_url, 
-                    params={"userId": user_id}, 
-                    headers={"X-Emby-Token": JELLYFIN_API_KEY}, 
-                    timeout=2
-                )
-                if parents_resp.status_code == 200:
-                    parents = parents_resp.json()
-                    folder_names = [p.get("Name") for p in parents]
-                    for name in folder_names:
-                        if name in JELLYFIN_IGNORE_LIBRARIES:
-                            print(f"[BLOCKED] Hidden Library Found: {name}")
-                            return None
-                else:
-                    print(f"[DEBUG] Ancestor Check Failed: {parents_resp.status_code}")
-                    return None
+            item_id = item.get("Id")
+            
+            if item_id in library_cache:
+                if not library_cache[item_id]:
+                    return None 
+            else:
+                try:
+                    user_id = session.get("UserId")
+                    anc_url = f"{base_url}/Items/{item_id}/Ancestors"
+                    parents_resp = requests.get(
+                        anc_url, 
+                        params={"userId": user_id}, 
+                        headers={"X-Emby-Token": JELLYFIN_API_KEY}, 
+                        timeout=2
+                    )
                     
-            except Exception as e:
-                print(f"[DEBUG] Blacklist Error: {e}")
-                return None
+                    if parents_resp.status_code == 200:
+                        parents = parents_resp.json()
+                        folder_names = [p.get("Name") for p in parents]
+                        
+                        is_safe = True
+                        for name in folder_names:
+                            if name in JELLYFIN_IGNORE_LIBRARIES:
+                                print(f"[BLOCKED] Hidden Library Found: {name}")
+                                is_safe = False
+                                break
+                        
+                        library_cache[item_id] = is_safe
+                        
+                        if not is_safe:
+                            return None
+                            
+                    else:
+                        print(f"[DEBUG] Ancestor Check Failed: {parents_resp.status_code}")
+                        return None
+                        
+                except Exception as e:
+                    print(f"[DEBUG] Blacklist Error: {e}")
+                    return None
 
         prog = session["PlayState"].get("PositionTicks", 0) / 10000000
         dur = item.get("RunTimeTicks", 0) / 10000000
@@ -202,7 +227,7 @@ def fetch_jellyfin():
             "start": int(time.time() - prog),
             "end": int(time.time() - prog + dur),
             "cover": get_jellyfin_cover(base_url, item.get("Id"), JELLYFIN_API_KEY, series if series else title, year, item.get('Type')),
-            "text": "StreamNode", #You should replace this with your own branding
+            "text": "StreamNode", # You should replace this with your own branding
             "status": "Playing"
         }
     except Exception as e: 
@@ -360,7 +385,9 @@ def main():
             send_frame(sock, 1, payload)
         except:
             print("\nConnection lost. Reconnecting...")
-            sock.close()
+            if sock:
+                try: sock.close()
+                except: pass
             sock = None
         time.sleep(15)
 
