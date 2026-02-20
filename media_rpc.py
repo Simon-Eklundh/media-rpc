@@ -17,7 +17,7 @@ JELLYFIN_SERVER = os.getenv("JELLYFIN_SERVER")
 JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
 JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
 #JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] # Sample blacklist to hide certain libraries from showing up in RPC.
-JELLYFIN_IGNORE_LIBRARIES = []
+JELLYFIN_IGNORE_LIBRARIES = ["Youtube", "Youtube Backups"]
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # 2. Audiobookshelf Config
@@ -280,8 +280,16 @@ def fetch_jellyfin():
         dur = item.get("RunTimeTicks", 0) / 10000000
         year = item.get('ProductionYear')
         series = item.get('SeriesName')
-        state_text = f"{series} ({year}) • StreamNode" if series else f"{year} • StreamNode" # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
-
+        state_text = f"{series} ({year})" if series else f"{year}" # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        client = session.get("Client")
+        match client:
+            case "AFinity":
+                small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
+            case "Streamyfin":
+                small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/streamyfin.webp"
+            case _:
+                    # default to jf
+                small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/jellyfin.webp"
         return {
             "type": 3,
             "details": title,
@@ -289,8 +297,9 @@ def fetch_jellyfin():
             "start": int(time.time() - prog),
             "end": int(time.time() - prog + dur),
             "cover": get_jellyfin_cover(base_url, item.get("Id"), JELLYFIN_API_KEY, series if series else title, year, item.get('Type')),
-            "text": "StreamNode", # You should replace this with your own branding
-            "status": "Playing"
+            "text": "Oakgrove",
+            "status": "Playing",
+            "client_image": small_icon
         }
     except Exception as e: 
         print(f"[DEBUG] Error: {e}")
@@ -373,8 +382,15 @@ def fetch_abs():
 
         start_ts = int(now - current_time)
         end_ts = int(start_ts + dur)
-        abs_state_text = f"{display_author} • AudioNode" # You should replace "AudioNode" with your own branding or remove it entirely if you prefer a cleaner look.
-
+        abs_state_text = f"{display_author}" # You should replace "AudioNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        client = session["deviceInfo"].get("clientName")
+        print("client:")
+        print(client)
+        match client:
+            case "AFinity":
+                icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
+            case _:
+                icon = "https://raw.githubusercontent.com/advplyr/audiobookshelf/refs/heads/master/client/static/Logo.png"
         return {
             "type": 2,
             "details": line1,
@@ -383,7 +399,8 @@ def fetch_abs():
             "end": end_ts,
             "cover": cover,
             "text": abs_state_text,
-            "status": "Playing"
+            "status": "Playing",
+            "client_image": icon
         }
     except: return None
 
@@ -412,9 +429,12 @@ def main():
         if not sock: sock = connect()
 
         data = fetch_jellyfin()
-        if not data: data = fetch_abs()
-
+        
+        if not data: 
+            data = fetch_abs()
+            
         if data:
+            small_icon = data["client_image"]
             activity_key = (data['details'], data['state'])
             if activity_key != last_printed:
                 print(f"\n[{data.get('text', 'RPC')}] {data['details']} — {data['state']}")
@@ -422,9 +442,12 @@ def main():
                 last_printed = activity_key
 
             timestamps = {"start": data['start'], "end": data['end']}
-            small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp" # You should replace this with your own small icon, preferably a play icon
+             # You should replace this with your own small icon, preferably a play icon
             
             activity = {
+                "name": data["details"],
+                "status_display_type": 2, # 0,1,2
+
                 "details": data['details'],
                 "state": data['state'],
                 "assets": {
@@ -434,7 +457,8 @@ def main():
                     "small_text": "Playing"
                 },
                 "type": data['type'],
-                "timestamps": timestamps
+                "timestamps": timestamps,
+                "instance": True
             }
             payload = {"cmd": "SET_ACTIVITY", "args": {"pid": os.getpid(), "activity": activity}, "nonce": str(time.time())}
         else:
