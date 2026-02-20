@@ -28,6 +28,11 @@ ABS_API_TOKEN = os.getenv("ABS_API_TOKEN")
 IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID") 
 USE_IMGUR = False # Set to False if you don't have a Client ID
 
+# Optional: whether to show client or movie/show/book title on the discord activity field 
+DISCORD_TITLE = os.getenv("DISCORD_TITLE", default = "details") 
+ALLOWED_DISCORD_TITLES = ['details', 'client']
+
+
 # --- STATE MANAGEMENT ---
 abs_state = {
     "last_api_time": 0,
@@ -280,8 +285,18 @@ def fetch_jellyfin():
         dur = item.get("RunTimeTicks", 0) / 10000000
         year = item.get('ProductionYear')
         series = item.get('SeriesName')
-        state_text = f"{series} ({year}) • StreamNode" if series else f"{year} • StreamNode" # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
-
+        state_text = f"{series} ({year})" if series else f"{year} • StreamNode" # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        
+        # Logic to get client icon in the little area in discord activity details
+        client = session.get("Client")
+        match client:
+            case "AFinity":
+                small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
+            case "Streamyfin":
+                small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/streamyfin.webp"
+            case _:
+                    # default to jf
+                small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/jellyfin.webp"
         return {
             "type": 3,
             "details": title,
@@ -289,8 +304,10 @@ def fetch_jellyfin():
             "start": int(time.time() - prog),
             "end": int(time.time() - prog + dur),
             "cover": get_jellyfin_cover(base_url, item.get("Id"), JELLYFIN_API_KEY, series if series else title, year, item.get('Type')),
-            "text": "StreamNode", # You should replace this with your own branding
-            "status": "Playing"
+            "text": "StreamNode",
+            "status": "Playing",
+            "client_image": small_icon,
+            "client": client
         }
     except Exception as e: 
         print(f"[DEBUG] Error: {e}")
@@ -374,7 +391,13 @@ def fetch_abs():
         start_ts = int(now - current_time)
         end_ts = int(start_ts + dur)
         abs_state_text = f"{display_author} • AudioNode" # You should replace "AudioNode" with your own branding or remove it entirely if you prefer a cleaner look.
-
+        # logic for which client icon to show
+        client = session["deviceInfo"].get("clientName")
+        match client:
+            case "AFinity":
+                icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
+            case _:
+                icon = "https://raw.githubusercontent.com/advplyr/audiobookshelf/refs/heads/master/client/static/Logo.png"
         return {
             "type": 2,
             "details": line1,
@@ -383,7 +406,9 @@ def fetch_abs():
             "end": end_ts,
             "cover": cover,
             "text": abs_state_text,
-            "status": "Playing"
+            "status": "Playing",
+            "client_image": icon,
+            "client": client
         }
     except: return None
 
@@ -408,13 +433,21 @@ def main():
     sock = None
     last_printed = None
 
+    global DISCORD_TITLE
+    print("discord title")
+    print(DISCORD_TITLE)
+    if DISCORD_TITLE not in ALLOWED_DISCORD_TITLES:
+        print("INVALID DISCORD TITLE FOUND. SETTING DETAILS INSTEAD. PLEASE VALIDATE")
+        DISCORD_TITLE = 'details'
     while True:
         if not sock: sock = connect()
 
         data = fetch_jellyfin()
-        if not data: data = fetch_abs()
-
+        if not data: 
+            data = fetch_abs()
+            
         if data:
+            small_icon = data["client_image"]
             activity_key = (data['details'], data['state'])
             if activity_key != last_printed:
                 print(f"\n[{data.get('text', 'RPC')}] {data['details']} — {data['state']}")
@@ -422,9 +455,9 @@ def main():
                 last_printed = activity_key
 
             timestamps = {"start": data['start'], "end": data['end']}
-            small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp" # You should replace this with your own small icon, preferably a play icon
-            
+            name = DISCORD_TITLE
             activity = {
+                "name": data[name],
                 "details": data['details'],
                 "state": data['state'],
                 "assets": {
@@ -434,7 +467,8 @@ def main():
                     "small_text": "Playing"
                 },
                 "type": data['type'],
-                "timestamps": timestamps
+                "timestamps": timestamps,
+                "instance": True
             }
             payload = {"cmd": "SET_ACTIVITY", "args": {"pid": os.getpid(), "activity": activity}, "nonce": str(time.time())}
         else:
