@@ -240,20 +240,28 @@ def fetch_jellyfin():
         item = session["NowPlayingItem"]
         title = item.get('Name')
         if JELLYFIN_IGNORE_LIBRARIES:
+            artist_name = "StreamNode" # can be changed
             item_id = item.get("Id")
-            
+            if item.get("SeriesId"):
+                item_id = item.get("SeriesId")
+            if item.get("ArtistItems"):
+                if item.get("ArtistItems")[0].get("Id"):
+                    item_id = item.get("ArtistItems")[0].get("Id")
+                    artist_name = item.get("AlbumArtist") 
             if item_id in library_cache:
+                print("item cached")
                 if not library_cache[item_id]:
                     return None 
             else:
                 try:
+                    print("testing item")
                     user_id = session.get("UserId")
                     anc_url = f"{base_url}/Items/{item_id}/Ancestors"
                     parents_resp = requests.get(
                         anc_url, 
-                        params={"userId": user_id}, 
+                        params={"userId": user_id},
                         headers={"X-Emby-Token": JELLYFIN_API_KEY}, 
-                        timeout=2
+                        timeout=9
                     )
                     
                     if parents_resp.status_code == 200:
@@ -294,20 +302,28 @@ def fetch_jellyfin():
                 small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
             case "Streamyfin":
                 small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/streamyfin.webp"
+            case "Jellify":
+                small_icon = "https://i.ibb.co/zVCxQFJN/jellify.png"
+            case "Pelagica":
+                small_icon = "https://raw.githubusercontent.com/KartoffelChipss/pelagica/refs/heads/main/frontend/public/favicons/web-app-manifest-512x512.png"
             case _:
                     # default to jf
                 small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/jellyfin.webp"
+        discord_type = 3
+        if item.get('Type') == 'Audio':
+            discord_type = 2
         return {
-            "type": 3,
+            "type": discord_type,
             "details": title,
             "state": state_text,
             "start": int(time.time() - prog),
             "end": int(time.time() - prog + dur),
             "cover": get_jellyfin_cover(base_url, item.get("Id"), JELLYFIN_API_KEY, series if series else title, year, item.get('Type')),
-            "text": "StreamNode",
+            "text": artist_name,
             "status": "Playing",
             "client_image": small_icon,
-            "client": client
+            "client": client,
+            "artist": artist_name
         }
     except Exception as e: 
         print(f"[DEBUG] Error: {e}")
@@ -434,8 +450,6 @@ def main():
     last_printed = None
 
     global DISCORD_TITLE
-    print("discord title")
-    print(DISCORD_TITLE)
     if DISCORD_TITLE not in ALLOWED_DISCORD_TITLES:
         print("INVALID DISCORD TITLE FOUND. SETTING DETAILS INSTEAD. PLEASE VALIDATE")
         DISCORD_TITLE = 'details'
@@ -455,9 +469,12 @@ def main():
                 last_printed = activity_key
 
             timestamps = {"start": data['start'], "end": data['end']}
-            name = DISCORD_TITLE
+            name_key = DISCORD_TITLE
+            name = data[name_key]
+            if data["artist"]:
+                name = name + " • " + data["artist"]
             activity = {
-                "name": data[name],
+                "name": name,
                 "details": data['details'],
                 "state": data['state'],
                 "assets": {
