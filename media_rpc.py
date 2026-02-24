@@ -238,15 +238,15 @@ def fetch_jellyfin():
 
         item = session["NowPlayingItem"]
         title = item.get('Name')
-        artist_name = " • StreamNode" # can be changed
+        artist_name = "StreamNode" # can be changed
         item_id = item.get("Id")
         if item.get("SeriesId"):
             item_id = item.get("SeriesId")
-            artist_name = " • " + item.get("SeriesName")
+            artist_name = item.get("SeriesName")
         if item.get("ArtistItems"):
             if item.get("ArtistItems")[0].get("Id"):
                 item_id = item.get("ArtistItems")[0].get("Id")
-                artist_name = " • " + item.get("AlbumArtist") 
+                artist_name = item.get("AlbumArtist") 
         if JELLYFIN_IGNORE_LIBRARIES:
             if item_id in library_cache:
                 if not library_cache[item_id]:
@@ -322,7 +322,7 @@ def fetch_jellyfin():
             "client_image": small_icon,
             "client": client,
             "artist": artist_name,
-            "name":  title + artist_name
+            "name":  title + ' • ' + artist_name
         }
     except Exception as e: 
         print(f"[DEBUG] Error: {e}")
