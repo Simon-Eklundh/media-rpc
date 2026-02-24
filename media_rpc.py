@@ -309,7 +309,7 @@ def fetch_jellyfin():
                 small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/jellyfin.webp"
         discord_type = 3
         if item.get('Type') == 'Audio':
-            discord_type = 2}')
+            discord_type = 2
         return {
             "type": discord_type,
             "details": title,
