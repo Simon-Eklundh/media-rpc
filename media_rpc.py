@@ -309,8 +309,7 @@ def fetch_jellyfin():
                 small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/jellyfin.webp"
         discord_type = 3
         if item.get('Type') == 'Audio':
-            discord_type = 2
-        print(f'details: {title}, text: {artist_name}')
+            discord_type = 2}')
         return {
             "type": discord_type,
             "details": title,
@@ -396,7 +395,6 @@ def fetch_abs():
                 line1 = f"{line1} (S{season}:E{episode_num})"
         else:
             line1 = get_chapter_name(item_details, current_time)
-            print(f'line1: {line1}')
             if not line1: line1 = meta.get("title") or "Unknown Chapter"
             line2 = display_title
 
@@ -416,7 +414,6 @@ def fetch_abs():
             case _:
                 icon = "https://raw.githubusercontent.com/advplyr/audiobookshelf/refs/heads/master/client/static/Logo.png"
         
-        print(f'details: {line1}, state: {line2}')
         return {
             "type": 2,
             "details": line1,
