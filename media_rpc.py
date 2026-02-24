@@ -28,10 +28,8 @@ ABS_API_TOKEN = os.getenv("ABS_API_TOKEN")
 IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID") 
 USE_IMGUR = False # Set to False if you don't have a Client ID
 
-# Optional: whether to show client or movie/show/book title on the discord activity field 
-DISCORD_TITLE = os.getenv("DISCORD_TITLE", default = "details") 
-ALLOWED_DISCORD_TITLES = ['details', 'client']
-
+# Optional: whether to use chapter title or just index for ABS
+USE_CHAPTER_TITLE = os.getenv("USE_CHAPTER_TITLE", default="true") == "true"
 
 # --- STATE MANAGEMENT ---
 abs_state = {
@@ -212,11 +210,12 @@ def get_jellyfin_cover(base_url, item_id, api_key, title, year, item_type):
 def get_chapter_name(item_details, current_time):
     media = item_details.get("media", {})
     chapters = media.get("chapters", [])
-    
     if not chapters: return None
 
     for chapter in chapters:
         if chapter["start"] <= current_time <= chapter["end"]:
+            if( not USE_CHAPTER_TITLE):
+                return f"Chapter {chapter.get('id') + 1}"
             title = chapter.get("title", "Unknown Chapter")
             lower_title = title.lower()
             prefixes = ["chapter", "chap", "ch", "part", "track"]
@@ -239,22 +238,21 @@ def fetch_jellyfin():
 
         item = session["NowPlayingItem"]
         title = item.get('Name')
+        artist_name = " • StreamNode" # can be changed
+        item_id = item.get("Id")
+        if item.get("SeriesId"):
+            item_id = item.get("SeriesId")
+            artist_name = " • " + item.get("SeriesName")
+        if item.get("ArtistItems"):
+            if item.get("ArtistItems")[0].get("Id"):
+                item_id = item.get("ArtistItems")[0].get("Id")
+                artist_name = " • " + item.get("AlbumArtist") 
         if JELLYFIN_IGNORE_LIBRARIES:
-            artist_name = "StreamNode" # can be changed
-            item_id = item.get("Id")
-            if item.get("SeriesId"):
-                item_id = item.get("SeriesId")
-            if item.get("ArtistItems"):
-                if item.get("ArtistItems")[0].get("Id"):
-                    item_id = item.get("ArtistItems")[0].get("Id")
-                    artist_name = item.get("AlbumArtist") 
             if item_id in library_cache:
-                print("item cached")
                 if not library_cache[item_id]:
                     return None 
             else:
                 try:
-                    print("testing item")
                     user_id = session.get("UserId")
                     anc_url = f"{base_url}/Items/{item_id}/Ancestors"
                     parents_resp = requests.get(
@@ -312,6 +310,7 @@ def fetch_jellyfin():
         discord_type = 3
         if item.get('Type') == 'Audio':
             discord_type = 2
+        print(f'details: {title}, text: {artist_name}')
         return {
             "type": discord_type,
             "details": title,
@@ -323,7 +322,8 @@ def fetch_jellyfin():
             "status": "Playing",
             "client_image": small_icon,
             "client": client,
-            "artist": artist_name
+            "artist": artist_name,
+            "name":  title + artist_name
         }
     except Exception as e: 
         print(f"[DEBUG] Error: {e}")
@@ -396,6 +396,7 @@ def fetch_abs():
                 line1 = f"{line1} (S{season}:E{episode_num})"
         else:
             line1 = get_chapter_name(item_details, current_time)
+            print(f'line1: {line1}')
             if not line1: line1 = meta.get("title") or "Unknown Chapter"
             line2 = display_title
 
@@ -414,6 +415,8 @@ def fetch_abs():
                 icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
             case _:
                 icon = "https://raw.githubusercontent.com/advplyr/audiobookshelf/refs/heads/master/client/static/Logo.png"
+        
+        print(f'details: {line1}, state: {line2}')
         return {
             "type": 2,
             "details": line1,
@@ -424,7 +427,9 @@ def fetch_abs():
             "text": abs_state_text,
             "status": "Playing",
             "client_image": icon,
-            "client": client
+            "client": client,
+            "artist": display_author,
+            "name": display_title + " • " + display_author
         }
     except: return None
 
@@ -448,11 +453,6 @@ def main():
     load_caches()
     sock = None
     last_printed = None
-
-    global DISCORD_TITLE
-    if DISCORD_TITLE not in ALLOWED_DISCORD_TITLES:
-        print("INVALID DISCORD TITLE FOUND. SETTING DETAILS INSTEAD. PLEASE VALIDATE")
-        DISCORD_TITLE = 'details'
     while True:
         if not sock: sock = connect()
 
@@ -469,14 +469,10 @@ def main():
                 last_printed = activity_key
 
             timestamps = {"start": data['start'], "end": data['end']}
-            name_key = DISCORD_TITLE
-            name = data[name_key]
-            if data["artist"]:
-                name = name + " • " + data["artist"]
             activity = {
-                "name": name,
+                "name": data['name'],
                 "details": data['details'],
-                "state": data['state'],
+                "state":  data['state'],
                 "assets": {
                     "large_image": data['cover'],
                     "large_text": data['text'],
