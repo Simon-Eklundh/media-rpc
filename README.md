@@ -32,7 +32,7 @@ A Discord Rich Presence client that shows what you're watching on Jellyfin or li
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10+ (for mac this might require homebrew)
 - A running [Jellyfin](https://jellyfin.org/) and/or [Audiobookshelf](https://www.audiobookshelf.org/) instance
 - A [Discord application](https://discord.com/developers/applications) with a Client ID
 - A reverse proxy (Caddy, Nginx, Apache, Traefik) with a public domain for ABS cover art - see [Cover Art Setup](#cover-art-setup)
@@ -40,6 +40,54 @@ A Discord Rich Presence client that shows what you're watching on Jellyfin or li
 ---
 
 ## Installation
+
+### venv version (recommended)
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/MakD/media-rpc.git
+cd media-rpc
+```
+**2. Create and source virtual environment**
+```bash
+# python or python3 depending on your setup
+python -m venv venv
+
+source venv/bin/activate
+```
+
+**3. Install dependencies:**
+
+```bash
+pip install -r requirements.txt
+```
+
+**4. Configure the script:**
+
+```bash
+# discord
+DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
+# jellyfin
+JELLYFIN_SERVER=https://jellyfin.example.com/Sessions
+JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY
+JELLYFIN_USER_ID=YOUR_JELLYFIN_USER_ID
+TMDB_API_KEY=YOUR_TMDB_API_KEY
+# audiobookshelf
+ABS_SERVER=https://abs.example.com
+ABS_API_TOKEN=YOUR_ABS_API_TOKEN
+# optional
+IMGUR_CLIENT_ID=YOUR_IMGUR_CLIENT_ID
+# decides on if discord should show the title of the audiobookshelf book chapters or just the index.
+# optional, defaults to true
+USE_CHAPTER_TITLE=true
+  
+**5. Run media-rpc:**
+```bash
+# python or python3 depending on your setup
+python media-rpc
+```
+
+## global version (not recommended)
 
 **1. Clone the repository:**
 ```bash
@@ -49,24 +97,30 @@ cd media-rpc
 
 **2. Install dependencies:**
 ```bash
-pip install requests python-dotenv
+pip install requests python-dotenv pypresence
+# or
+pip install -r requirements.txt
 # Note: On newer Debian/Ubuntu systems, use `sudo apt install python3-requests python3-dotenv` instead.
 ```
 
 **3. Configure the script:** Create a new file named `.env` in the same directory as the script and fill in your details:
 
-```env
-DISCORD_CLIENT_ID=YOUR_DISCORD_APPLICATION_ID
-
-# Jellyfin
+```bash
+# discord
+DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
+# jellyfin
 JELLYFIN_SERVER=https://jellyfin.example.com/Sessions
 JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY
 JELLYFIN_USER_ID=YOUR_JELLYFIN_USER_ID
 TMDB_API_KEY=YOUR_TMDB_API_KEY
-
-# Audiobookshelf
+# audiobookshelf
 ABS_SERVER=https://abs.example.com
 ABS_API_TOKEN=YOUR_ABS_API_TOKEN
+# optional
+IMGUR_CLIENT_ID=YOUR_IMGUR_CLIENT_ID
+# decides on if discord should show the title of the audiobookshelf book chapters or just the index.
+# optional, defaults to true
+USE_CHAPTER_TITLE=true
 ```
 
 **4. Run manually to test:**
