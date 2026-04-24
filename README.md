@@ -53,7 +53,12 @@ cd media-rpc
 # python or python3 depending on your setup
 python -m venv venv
 
+# linux/mac
 source venv/bin/activate
+# windows powershell:
+./venv/bin/Activate.ps1
+# in case of permission errors, run this and then retry:
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 **3. Install dependencies:**
@@ -80,7 +85,7 @@ IMGUR_CLIENT_ID=YOUR_IMGUR_CLIENT_ID
 # decides on if discord should show the title of the audiobookshelf book chapters or just the index.
 # optional, defaults to true
 USE_CHAPTER_TITLE=true
-  
+```
 **5. Run media-rpc:**
 ```bash
 # python or python3 depending on your setup
