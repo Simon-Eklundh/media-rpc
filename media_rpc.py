@@ -299,7 +299,7 @@ def fetch_jellyfin():
 
         # Logic to get client icon in the little area in discord activity details
         client = session.get("Client")
-        if   client.startswith("Moonfin"):
+        if client.startswith("Moonfin"):
             client = "Moonfin"
         match client:
             case "AFinity":
