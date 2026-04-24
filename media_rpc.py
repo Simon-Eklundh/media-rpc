@@ -299,6 +299,8 @@ def fetch_jellyfin():
 
         # Logic to get client icon in the little area in discord activity details
         client = session.get("Client")
+        if   client.startswith("Moonfin"):
+            client = "Moonfin"
         match client:
             case "AFinity":
                 small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
@@ -308,9 +310,13 @@ def fetch_jellyfin():
                 small_icon = "https://i.ibb.co/zVCxQFJN/jellify.png"
             case "Pelagica":
                 small_icon = "https://raw.githubusercontent.com/KartoffelChipss/pelagica/refs/heads/main/frontend/public/favicons/web-app-manifest-512x512.png"
+            case "Wholphin":
+                small_icon = "https://raw.githubusercontent.com/damontecres/Wholphin/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" 
+            case "Moonfin":
+                small_icon = "https://raw.githubusercontent.com/Moonfin-Client/Mobile-Desktop/main/assets/icons/moonfin.png"
             case _:
                 # default to jf
-                small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/jellyfin.webp"
+                small_icon = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR9hELYbRA5IB6-ci3AzpkvOTJ3BAq6-_LmMg&s"
         discord_type = 3
         if item.get("Type") == "Audio":
             discord_type = 2
@@ -510,11 +516,11 @@ def main():
     check_environment_variables()
     print("Starting RPC...")
     load_caches()
-    sock = None
+    rpc = None
     last_printed = None
     while True:
-        if not sock:
-            sock = connect()
+        if not rpc:
+            rpc = connect()
 
         data = fetch_jellyfin()
         if not data:
