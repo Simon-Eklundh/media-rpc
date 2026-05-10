@@ -11,28 +11,26 @@ load_dotenv(env_path)
 
 # --- CONFIGURATION ---
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-
 # 1. Jellyfin Config
 JELLYFIN_SERVER = os.getenv("JELLYFIN_SERVER")
 JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
 JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
-# JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Tollywood"] # Sample blacklist to hide certain libraries from showing up in RPC.
-JELLYFIN_IGNORE_LIBRARIES = []
+JELLYFIN_IGNORE_LIBRARIES = os.getenv("JELLYFIN_IGNORE_LIBRARIES", default="").split(",") if os.getenv("JELLYFIN_IGNORE_LIBRARIES") else []
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # 2. Audiobookshelf Config
 ABS_SERVER = os.getenv("ABS_SERVER")
 ABS_API_TOKEN = os.getenv("ABS_API_TOKEN")
 
-# Optional: Imgur Client ID
-IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID")
-USE_IMGUR = False  # Set to False if you don't have a Client ID
-
 # Optional: whether to use chapter title or just index for ABS
 USE_CHAPTER_TITLE = os.getenv("USE_CHAPTER_TITLE", default="true") == "true"
 
+# Option: default server name for anything missing it, can be used to set a custom name for the client instead of "Jellyfin" or "AudioNode"
+DEFAULT_JELLYFIN_SERVER_NAME = os.getenv("DEFAULT_JELLYFIN_SERVER_NAME", default="")
+DEFAULT_AUDIOBOOKSHELF_SERVER_NAME = os.getenv("DEFAULT_AUDIOBOOKSHELF_SERVER_NAME", default="")
 # --- STATE MANAGEMENT ---
 abs_state = {"last_api_time": 0, "last_position": None, "is_playing": False}
+
 
 # Cache files
 COVER_CACHE_FILE = "cover_cache.json"
@@ -100,24 +98,7 @@ def save_library_cache():
     except:
         pass
 
-
-# IMGUR / COVER LOGIC
-def upload_to_imgur(image_data):
-    try:
-        url = "https://api.imgur.com/3/image"
-        headers = {"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"}
-        resp = requests.post(
-            url, headers=headers, files={"image": image_data}, timeout=10
-        )
-        data = resp.json()
-        if data.get("success"):
-            return data["data"]["link"]
-    except:
-        pass
-    return None
-
-
-# ABS Cover Logic with direct linking (no Imgur)
+# ABS Cover Logic with direct linking
 def get_abs_cover(item_id):
     if item_id in cover_cache:
         return cover_cache[item_id]
@@ -238,7 +219,7 @@ def fetch_jellyfin():
 
         item = session["NowPlayingItem"]
         title = item.get("Name")
-        artist_name = "StreamNode"  # can be changed
+        artist_name = DEFAULT_JELLYFIN_SERVER_NAME  # can be changed
         item_id = item.get("Id")
         if item.get("SeriesId"):
             item_id = item.get("SeriesId")
@@ -294,12 +275,11 @@ def fetch_jellyfin():
         year = item.get("ProductionYear")
         series = item.get("SeriesName")
         state_text = (
-            f"{series} ({year})" if series else f"{year} • StreamNode"
-        )  # You should replace "StreamNode" with your own branding or remove it entirely if you prefer a cleaner look.
-
+           (f"{series} ({year})" if series else f"{year}") + (f" • {DEFAULT_JELLYFIN_SERVER_NAME}" if DEFAULT_JELLYFIN_SERVER_NAME else "")
+        ) 
         # Logic to get client icon in the little area in discord activity details
         client = session.get("Client")
-        if client.startswith("Moonfin"):
+        if   client.startswith("Moonfin"):
             client = "Moonfin"
         match client:
             case "AFinity":
@@ -438,7 +418,7 @@ def fetch_abs():
 
         start_ts = int(now - current_time)
         end_ts = int(start_ts + dur)
-        abs_state_text = f"{display_author} • AudioNode"  # You should replace "AudioNode" with your own branding or remove it entirely if you prefer a cleaner look.
+        abs_state_text = f"{display_author}" + (f" • {DEFAULT_AUDIOBOOKSHELF_SERVER_NAME}" if DEFAULT_AUDIOBOOKSHELF_SERVER_NAME else "")
         # logic for which client icon to show
         client = session["deviceInfo"].get("clientName")
         match client:
