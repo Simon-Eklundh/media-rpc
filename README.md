@@ -16,6 +16,23 @@ A Discord Rich Presence client that shows what you're watching on Jellyfin or li
 
 ---
 
+## Runners
+
+### scripts
+
+Two scripts are included:
+
+**`media_rpc_local.py`** - Discord must be running on the same machine. Connects over the local IPC socket. Simpler setup, no extra token needed. This is the safer option.
+
+**`media_rpc_gateway.py`** - Connects via the Discord gateway as a user account. Can run on a server or NAS without Discord installed. Requires an additional `DISCORD_TOKEN` in your `.env`.
+
+### docker
+
+in addition, you can run it in docker, either building it yourself, or using
+https://hub.docker.com/repository/docker/simoneklundh/media-rpc
+
+---
+
 ## Features
 
 - Jellyfin support - movies and TV shows with cover art (falls back to TMDB)
@@ -64,13 +81,17 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 **3. Install dependencies:**
 
 ```bash
-pip install -r requirements.txt
+# if you want to use the gateway version
+pip install -r gateway_requirements.txt
+# if you want the normal rpc version
+pip install -r local_requirements.txt
 ```
 
 **4. Configure the script:**
 
 ```bash
-# discord
+# discord (DISCORD_TOKEN is only required for media_rpc_gateway.py)
+DISCORD_TOKEN=YOUR_DISCORD_TOKEN
 DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
 # jellyfin
 JELLYFIN_SERVER=https://jellyfin.example.com/Sessions
@@ -80,16 +101,22 @@ TMDB_API_KEY=YOUR_TMDB_API_KEY
 # audiobookshelf
 ABS_SERVER=https://abs.example.com
 ABS_API_TOKEN=YOUR_ABS_API_TOKEN
-# optional
-IMGUR_CLIENT_ID=YOUR_IMGUR_CLIENT_ID
-# decides on if discord should show the title of the audiobookshelf book chapters or just the index.
 # optional, defaults to true
 USE_CHAPTER_TITLE=true
+#optional, defaults to empty string
+DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name 
+#optional, defaults to empty string
+DEFAULT_AUDIOBOOKSHELF_SERVER_NAME=audiobookshelf_server_name 
+#optional, defaults to empty list
+JELLYFIN_IGNORE_LIBRARIES=library1,library2
 ```
 **5. Run media-rpc:**
 ```bash
-# python or python3 depending on your setup
-python media-rpc
+# local runner - Discord must be running on this machine
+python media_rpc_local.py
+
+# gateway runner - runs anywhere, requires DISCORD_TOKEN
+python media_rpc_gateway.py
 ```
 
 ## global version (not recommended)
@@ -102,16 +129,17 @@ cd media-rpc
 
 **2. Install dependencies:**
 ```bash
-pip install requests python-dotenv pypresence
-# or
-pip install -r requirements.txt
-# Note: On newer Debian/Ubuntu systems, use `sudo apt install python3-requests python3-dotenv` instead.
+# if you want to use the gateway version
+pip install -r gateway_requirements.txt
+# if you want the normal rpc version
+pip install -r local_requirements.txt
 ```
 
 **3. Configure the script:** Create a new file named `.env` in the same directory as the script and fill in your details:
 
 ```bash
-# discord
+# discord (DISCORD_TOKEN is only required for media_rpc_gateway.py)
+DISCORD_TOKEN=YOUR_DISCORD_TOKEN
 DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
 # jellyfin
 JELLYFIN_SERVER=https://jellyfin.example.com/Sessions
@@ -121,16 +149,23 @@ TMDB_API_KEY=YOUR_TMDB_API_KEY
 # audiobookshelf
 ABS_SERVER=https://abs.example.com
 ABS_API_TOKEN=YOUR_ABS_API_TOKEN
-# optional
-IMGUR_CLIENT_ID=YOUR_IMGUR_CLIENT_ID
-# decides on if discord should show the title of the audiobookshelf book chapters or just the index.
 # optional, defaults to true
 USE_CHAPTER_TITLE=true
+#optional, defaults to empty string
+DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name 
+#optional, defaults to empty string
+DEFAULT_AUDIOBOOKSHELF_SERVER_NAME=audiobookshelf_server_name 
+#optional, defaults to empty list
+JELLYFIN_IGNORE_LIBRARIES=library1,library2
 ```
 
 **4. Run manually to test:**
 ```bash
-python3 media_rpc.py
+# local runner - Discord must be running on this machine
+python3 media_rpc_local.py
+
+# gateway runner - runs anywhere, requires DISCORD_TOKEN
+python3 media_rpc_gateway.py
 ```
 
 ---
@@ -141,6 +176,18 @@ python3 media_rpc.py
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create a new application
 3. Copy the **Application ID** (not a bot token) into `DISCORD_CLIENT_ID`
+
+### Discord User Token
+1. log into discord in the browser
+2. open browser dev tools (usually ctrl+shift+i or cmd+shift+i)
+3. open the network tab
+4. refresh page
+5. in the search field: search for credentials
+6. click the credentials item
+7. under "Request Headers", find the "Authorization" part.
+8. copy the value and put it into `DISCORD_TOKEN`
+
+it should look something like this `MTIzNDU2Nzg5MDEyMzQ1Njc4.GxKp2A.aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789ab`
 
 ### Jellyfin API Key
 1. In Jellyfin, go to **Dashboard → API Keys**
@@ -162,7 +209,7 @@ To ensure Discord only shows what *you* are watching and ignores other users on 
 2. Go to **Settings → API** and request a key
 
 ### Library Blacklist (optional)
-To hide specific Jellyfin libraries from showing in RPC, edit the list directly in `media_rpc.py`:
+To hide specific Jellyfin libraries from showing in RPC, edit the list directly in `media_rpc_gateway.py`:
 ```python
 JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Kids"]
 ```
@@ -237,7 +284,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/YOUR_USERNAME/path/to/media-rpc/media_rpc.py
+ExecStart=/usr/bin/python3 /home/YOUR_USERNAME/path/to/media-rpc/media_rpc_gateway.py # or use local if you want to run discord still
 WorkingDirectory=/home/YOUR_USERNAME/path/to/media-rpc/
 Restart=always
 RestartSec=10
