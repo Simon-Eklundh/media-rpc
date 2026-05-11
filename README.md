@@ -58,7 +58,32 @@ https://hub.docker.com/repository/docker/simoneklundh/media-rpc
 
 ## Installation
 
-### venv version (recommended)
+### Docker Compose version
+```yaml
+services:
+  media-rpc:
+    image: simoneklundh/media-rpc
+    container_name: media-rpc
+    restart: unless-stopped
+    environment:
+      - DISCORD_CLIENT_ID=idhere
+      - DISCORD_TOKEN=tokenhere
+      - JELLYFIN_SERVER=https://jellyfin.domain.tld/Sessions
+      - JELLYFIN_API_KEY=apikeyhere
+      - JELLYFIN_USER_ID=useridhere
+      - TMDB_API_KEY=api_key_here
+      - ABS_SERVER=https://books.domain.tld
+      - ABS_API_TOKEN=apitokenhere
+      - USE_CHAPTER_TITLE=true
+      - DEFAULT_JELLYFIN_SERVER_NAME= Custom Server Name
+      - DEFAULT_AUDIOBOOKSHELF_SERVER_NAME= Custom Server Name
+      - JELLYFIN_IGNORE_LIBRARIES=Library1,Library2,Library3
+```
+[How to get the variables](#Configuration)  
+
+[How To Get Audiobookshelf Images In Discord](#Cover-Art-Setup)
+
+### venv version (recommended for non-docker use)
 
 **1. Clone the repository:**
 ```bash
@@ -71,7 +96,7 @@ cd media-rpc
 python -m venv venv
 
 # linux/mac
-source venv/bin/activate
+source venv/bin/activate (or activate.fish for fish users)
 # windows powershell:
 ./venv/bin/Activate.ps1
 # in case of permission errors, run this and then retry:
@@ -167,7 +192,6 @@ python3 media_rpc_local.py
 # gateway runner - runs anywhere, requires DISCORD_TOKEN
 python3 media_rpc_gateway.py
 ```
-
 ---
 
 ## Configuration
@@ -209,9 +233,12 @@ To ensure Discord only shows what *you* are watching and ignores other users on 
 2. Go to **Settings → API** and request a key
 
 ### Library Blacklist (optional)
-To hide specific Jellyfin libraries from showing in RPC, edit the list directly in `media_rpc_gateway.py`:
+To hide specific Jellyfin libraries from showing in RPC, edit the list in the .env or the variable `JELLYFIN_IGNORE_LIBRARIES` in the compose:
 ```python
 JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Kids"]
+```
+```compose
+JELLYFIN_IGNORE_LIBRARIES=Bollywood,Kids
 ```
 
 ---
