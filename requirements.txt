@@ -1,0 +1,7 @@
+python-dotenv
+requests
+PySocks
+discord_protos
+protobuf
+pypresence
+websocket-client
