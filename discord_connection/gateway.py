@@ -13,7 +13,6 @@ import urllib
 import urllib.parse
 import zlib
 from threading import Lock
-
 import json
 
 import socks
@@ -22,43 +21,24 @@ from discord_protos import PreloadedUserSettings
 from google.protobuf.json_format import MessageToDict
 
 DISCORD_HOST = "discord.com"
-LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
+LOCAL_MEMBER_COUNT = 50  # members per guild, CPU-RAM intensive
 ZLIB_SUFFIX = b"\x00\x00\xff\xff"
-VOICE_FLAGS = 3   # CLIPS_ENABLED and ALLOW_VOICE_RECORDING
+VOICE_FLAGS = 3  # CLIPS_ENABLED and ALLOW_VOICE_RECORDING
 DEFAULT_CAPABILITIES = 30717
 DEFAULT_INTENTS = 50364033
 QOS_HEARTBEAT = True
 QOS_PAYLOAD = {"ver": 26, "active": True, "reason": "foregrounded"}
-inflator = zlib.decompressobj()
+
 logger = logging.getLogger(__name__)
 status_unpacker = struct.Struct("!H")
 
-
-def zlib_decompress(data):
-    """Decompress zlib data, if it is not zlib compressed, return data instead"""
-    if len(data) < 4 or data[-4:] != ZLIB_SUFFIX:
-        return data
-    try:
-        return inflator.decompress(data)
-    except zlib.error as e:
-        logger.error(f"zlib error: {e}")
-        print(f"zlib error: {e}")
-        return None
-
-
-def reset_inflator():
-    """Resets inflator object"""
-    global inflator
-    del inflator
-    inflator = zlib.decompressobj()   # noqa
-
-
-
-
-class Gateway():
+class Gateway:
     """Methods for fetching and sending data to Discord gateway through websocket"""
 
-    def __init__(self, token, host, client_prop, user_agent, proxy=None, capablities=None):
+    def __init__(
+        self, token, host, client_prop, user_agent, proxy=None, capablities=None
+    ):
+        self.inflator = zlib.decompressobj()
         if host:
             host_obj = urllib.parse.urlsplit(host)
             if host_obj.netloc:
@@ -105,17 +85,17 @@ class Gateway():
         self.heartbeat_missed_count = 0  # track missed heartbeats
         threading.Thread(target=self.thread_guard, daemon=True, args=()).start()
 
-
     def thread_guard(self):
         """Check if reconnect is requested and run reconnect thread if its not running"""
         while self.run:
             if self.reconnect_requested:
                 self.reconnect_requested = False
                 if not self.reconnect_thread.is_alive():
-                    self.reconnect_thread = threading.Thread(target=self.reconnect, daemon=True, args=())
+                    self.reconnect_thread = threading.Thread(
+                        target=self.reconnect, daemon=True, args=()
+                    )
                     self.reconnect_thread.start()
             time.sleep(0.5)
-
 
     def connect_ws(self, resume=False):
         """Connect to websocket"""
@@ -133,8 +113,10 @@ class Gateway():
                 http_proxy_port=self.proxy.port,
             )
         else:
-            self.ws.connect(gateway_url + "/?v=9&encoding=json&compress=zlib-stream", header=self.header)
-
+            self.ws.connect(
+                gateway_url + "/?v=9&encoding=json&compress=zlib-stream",
+                header=self.header,
+            )
 
     def disconnect_ws(self, timeout=2, status=1000):
         """Close websocket with timeout"""
@@ -150,13 +132,14 @@ class Gateway():
             finally:
                 self.ws = None
 
-
     def connect(self):
         """Create initial connection to Discord gateway"""
         # get proxy
         if self.proxy.scheme:
             if self.proxy.scheme.lower() == "http":
-                connection = http.client.HTTPSConnection(self.proxy.hostname, self.proxy.port)
+                connection = http.client.HTTPSConnection(
+                    self.proxy.hostname, self.proxy.port
+                )
                 connection.set_tunnel(self.host, port=443)
             elif "socks" in self.proxy.scheme.lower():
                 proxy_sock = socks.socksocket()
@@ -164,8 +147,10 @@ class Gateway():
                 proxy_sock.connect((self.host, 443))
                 ssl_context = ssl.create_default_context()
                 ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-                proxy_sock = ssl_context.wrap_socket(proxy_sock, server_hostname=self.host)
-                proxy_sock.do_handshake()   # seems like its not needed
+                proxy_sock = ssl_context.wrap_socket(
+                    proxy_sock, server_hostname=self.host
+                )
+                proxy_sock.do_handshake()  # seems like its not needed
                 connection = http.client.HTTPSConnection(self.host, 443)
                 connection.sock = proxy_sock
             else:
@@ -190,20 +175,29 @@ class Gateway():
             self.gateway_url = json.loads(data)["url"]
         else:
             connection.close()
-            logger.error(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
-            raise SystemExit(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
+            logger.error(
+                f"Failed to get gateway url. Response code: {response.status}. Exiting..."
+            )
+            raise SystemExit(
+                f"Failed to get gateway url. Response code: {response.status}. Exiting..."
+            )
 
         self.connect_ws()
         with self.state_lock:
             self.state = 1
-        self.heartbeat_interval = int(json.loads(zlib_decompress(self.ws.recv()))["d"]["heartbeat_interval"])
-        self.receiver_thread = threading.Thread(target=self.safe_function_wrapper, daemon=True, args=(self.receiver, ))
+        self.heartbeat_interval = int(
+            json.loads(self.zlib_decompress(self.ws.recv()))["d"]["heartbeat_interval"]
+        )
+        self.receiver_thread = threading.Thread(
+            target=self.safe_function_wrapper, daemon=True, args=(self.receiver,)
+        )
         self.receiver_thread.start()
-        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
+        self.heartbeat_thread = threading.Thread(
+            target=self.send_heartbeat, daemon=True
+        )
         self.heartbeat_thread.start()
         self.reconnect_thread = threading.Thread()
         self.authenticate()
-
 
     def safe_function_wrapper(self, function, args=()):
         """
@@ -215,38 +209,42 @@ class Gateway():
         except BaseException as e:
             self.error = "".join(traceback.format_exception(e))
 
-
     def send(self, request):
         """Send data to gateway"""
+        if not self.ws:
+            return
         try:
             self.ws.send(json.dumps(request))
         except websocket._exceptions.WebSocketException:
             self.reconnect_requested = True
 
-
     def set_my_user_data(self, data):
         """Set my user data from user object"""
         tag = None
-        if data.get("primary_guild") and "tag" in data["primary_guild"]:   # spacebar_fix - get
+        if (
+            data.get("primary_guild") and "tag" in data["primary_guild"]
+        ):  # spacebar_fix - get
             tag = data["primary_guild"]["tag"]
         if data.get("bot"):
             extra_data = None
         else:
             extra_data = {
                 "avatar": data["avatar"],
-                "avatar_decoration_data": data.get("avatar_decoration_data"),   # spacebar_fix - get
+                "avatar_decoration_data": data.get(
+                    "avatar_decoration_data"
+                ),  # spacebar_fix - get
                 "discriminator": data["discriminator"],
-                "flags": data.get("flags"),   # spacebar_fix - get
+                "flags": data.get("flags"),  # spacebar_fix - get
                 "premium_type": data["premium_type"],
             }
         self.my_user_data = {
             "id": data["id"],
             "guild_id": None,
             "username": data["username"],
-            "global_name": data.get("global_name"),   # spacebar_fix - get
+            "global_name": data.get("global_name"),  # spacebar_fix - get
             "nick": None,
             "bio": data.get("bio"),
-            "pronouns":  data.get("pronouns"),
+            "pronouns": data.get("pronouns"),
             "joined_at": None,
             "tag": tag,
             "bot": data.get("bot"),
@@ -254,7 +252,6 @@ class Gateway():
             "roles": None,
         }
         self.user_changed = True
-
 
     def receiver(self):
         """Receive and handle all traffic from gateway, should be run in a thread"""
@@ -283,7 +280,7 @@ class Gateway():
                 self.resumable = status in (4000, 4009)
                 break
             try:
-                data = zlib_decompress(data)
+                data = self.zlib_decompress(data)
                 if data:
                     try:
                         response = json.loads(data)
@@ -300,7 +297,9 @@ class Gateway():
                 print(f"Receiver error: {e}")
                 self.resumable = True
                 break
-            logger.debug(f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"] and "LIST" not in response["t"]) else 'None'}")
+            logger.debug(
+                f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"] and "LIST" not in response["t"]) else 'None'}"
+            )
             # debug_events
             # if response.get("t"):
             #     debug.save_json(response, f"{response["t"]}.json", False)
@@ -332,22 +331,30 @@ class Gateway():
 
                     # get user settings
                     if "user_settings_proto" in data and not self.legacy:
-                        decoded = PreloadedUserSettings.FromString(base64.b64decode(data["user_settings_proto"]))
+                        decoded = PreloadedUserSettings.FromString(
+                            base64.b64decode(data["user_settings_proto"])
+                        )
                         self.user_settings_proto = MessageToDict(decoded)
                     else:
                         self.legacy = True
                         old_user_settings = data["user_settings"]
-                        old_user_settings.update({
-                            "status": {
-                                "status": old_user_settings.get("status", "online"),
-                                "guildFolders": {
-                                    "guildPositions": old_user_settings.get("guild_positions"),
+                        old_user_settings.update(
+                            {
+                                "status": {
+                                    "status": old_user_settings.get("status", "online"),
+                                    "guildFolders": {
+                                        "guildPositions": old_user_settings.get(
+                                            "guild_positions"
+                                        ),
+                                    },
                                 },
-                            },
-                        })
+                            }
+                        )
                         self.user_settings_proto = old_user_settings
                         if old_user_settings.get("custom_status"):
-                            self.user_settings_proto["status"]["customStatus"] = old_user_settings["custom_status"]
+                            self.user_settings_proto["status"]["customStatus"] = (
+                                old_user_settings["custom_status"]
+                            )
                     self.proto_changed = True
 
                     # READY is huge so lets save some memory
@@ -368,14 +375,16 @@ class Gateway():
                             else:
                                 small_text = None
                                 large_text = None
-                            activities.append({
-                                "type": activity["type"],
-                                "name": activity["name"],
-                                "state": activity.get("state", ""),
-                                "details": activity.get("details", ""),
-                                "small_text": small_text,
-                                "large_text": large_text,
-                            })
+                            activities.append(
+                                {
+                                    "type": activity["type"],
+                                    "name": activity["name"],
+                                    "state": activity.get("state", ""),
+                                    "details": activity.get("details", ""),
+                                    "small_text": small_text,
+                                    "large_text": large_text,
+                                }
+                            )
                     self.my_status = {
                         "activities": activities,
                     }
@@ -384,13 +393,14 @@ class Gateway():
                 elif optext == "USER_SETTINGS_PROTO_UPDATE":
                     if data["partial"] or data["settings"]["type"] != 1:
                         continue
-                    decoded = PreloadedUserSettings.FromString(base64.b64decode(data["settings"]["proto"]))
+                    decoded = PreloadedUserSettings.FromString(
+                        base64.b64decode(data["settings"]["proto"])
+                    )
                     self.user_settings_proto = MessageToDict(decoded)
                     self.proto_changed = True
 
                 elif optext == "USER_UPDATE":
                     self.set_my_user_data(data)
-
 
             elif opcode == 7:
                 logger.info("Host requested reconnect")
@@ -410,7 +420,6 @@ class Gateway():
         self.reconnect_requested = True
         self.heartbeat_running = False
 
-
     def send_heartbeat(self):
         """Send heartbeat to gateway, if response is not received, triggers reconnect, should be run in a thread"""
         logger.debug(f"Heartbeater started, interval={self.heartbeat_interval/1000} s")
@@ -418,49 +427,72 @@ class Gateway():
         self.heartbeat_received = True
         # wait for ready event for some time
         elapsed_time = 0
-        timeout = max(15, self.heartbeat_interval / 1000 * 5)  # 5x heartbeat interval, minimum 15 seconds
+        timeout = max(
+            15, self.heartbeat_interval / 1000 * 5
+        )  # 5x heartbeat interval, minimum 15 seconds
         while not self.ready:
             if elapsed_time >= timeout:
-                logger.error("Ready event could not be processed in time, probably because of too many servers. Exiting...")
-                raise SystemExit("Ready event could not be processed in time, probably because of too many servers. Exiting...")
+                logger.error(
+                    "Ready event could not be processed in time, probably because of too many servers. Exiting..."
+                )
+                raise SystemExit(
+                    "Ready event could not be processed in time, probably because of too many servers. Exiting..."
+                )
             time.sleep(0.5)
             elapsed_time += 0.5
         # Use minimum jitter of 0.75 to avoid heartbeats arriving too early
         jitter = max(0.75, 0.8 - 0.6 * random.random())
         heartbeat_interval_rand = int(self.heartbeat_interval * jitter / 1000)
         heartbeat_sent_time = int(time.time())
-        time_spent_event_time = int(time.time()) - 1990   # send it 10s after start, then every 30min
+        time_spent_event_time = (
+            int(time.time()) - 1990
+        )  # send it 10s after start, then every 30min
         self.heartbeat_missed_count = 0
         while self.run and not self.wait and self.heartbeat_running:
-            send_time_spent_event = not self.legacy and int(time.time()) - time_spent_event_time >= 1800
+            send_time_spent_event = (
+                not self.legacy and int(time.time()) - time_spent_event_time >= 1800
+            )
             if send_time_spent_event:
-                self.send({
-                    "op": 41,
-                    "d": {
-                        "initialization_timestamp": self.init_time,
-                        "session_id": self.client_prop["client_heartbeat_session_id"],
-                        "client_launch_id": self.client_prop["client_launch_id"],
-                    },
-                })
+                self.send(
+                    {
+                        "op": 41,
+                        "d": {
+                            "initialization_timestamp": self.init_time,
+                            "session_id": self.client_prop[
+                                "client_heartbeat_session_id"
+                            ],
+                            "client_launch_id": self.client_prop["client_launch_id"],
+                        },
+                    }
+                )
                 logger.debug("Sent Time Spent event")
                 time_spent_event_time = int(time.time())
-            if time.time() - heartbeat_sent_time >= heartbeat_interval_rand or send_time_spent_event:
+            if (
+                time.time() - heartbeat_sent_time >= heartbeat_interval_rand
+                or send_time_spent_event
+            ):
                 if QOS_HEARTBEAT and not self.legacy:
-                    self.send({
-                        "op": 1,
-                        "d": {
-                            "seq": self.sequence,
-                            "qos": QOS_PAYLOAD,
-                        },
-                    })
+                    self.send(
+                        {
+                            "op": 1,
+                            "d": {
+                                "seq": self.sequence,
+                                "qos": QOS_PAYLOAD,
+                            },
+                        }
+                    )
                 else:
                     self.send({"op": 1, "d": self.sequence})
                 heartbeat_sent_time = int(time.time())
                 logger.debug("Sent heartbeat")
                 if not self.heartbeat_received:
                     self.heartbeat_missed_count += 1
-                    logger.warning(f"Heartbeat reply not received ({self.heartbeat_missed_count}/3)")
-                    print(f"Heartbeat reply not received ({self.heartbeat_missed_count}/3)")
+                    logger.warning(
+                        f"Heartbeat reply not received ({self.heartbeat_missed_count}/3)"
+                    )
+                    print(
+                        f"Heartbeat reply not received ({self.heartbeat_missed_count}/3)"
+                    )
                     if self.heartbeat_missed_count >= 3:
                         logger.warning("Too many missed heartbeats, reconnecting")
                         print("Too many missed heartbeats, reconnecting")
@@ -478,7 +510,6 @@ class Gateway():
             self.state = 0
         logger.debug("Heartbeater stopped")
         self.reconnect_requested = True
-
 
     def authenticate(self):
         """Authenticate client with discord gateway"""
@@ -501,15 +532,15 @@ class Gateway():
             payload["d"]["intents"] = self.capabilities or DEFAULT_INTENTS
         self.send(payload)
 
-
     def resume(self):
         """
         Try to resume discord gateway session on url provided by Discord in READY event.
         Return gateway response code, 9 means resumming has failed
         """
-        self.ws.close(timeout=0)   # this will stop receiver
-        time.sleep(1)   # so receiver ends before opening new socket
-        reset_inflator()   # otherwise decompression wont work
+        if self.ws:
+            self.ws.close(timeout=0)  # this will stop receiver
+        time.sleep(1)  # so receiver ends before opening new socket
+        self.inflator = zlib.decompressobj()  # otherwise decompression wont work
         self.ws = websocket.WebSocket()
         try:
             self.connect_ws(resume=True)
@@ -517,11 +548,18 @@ class Gateway():
             logger.info("Failed to resume connection")
             print("Failed to resume connection")
             return 9
-        _ = zlib_decompress(self.ws.recv())
-        payload = {"op": 6, "d": {"token": self.token, "session_id": self.session_id, "seq": self.sequence}}
+        _ = self.zlib_decompress(self.ws.recv())
+        payload = {
+            "op": 6,
+            "d": {
+                "token": self.token,
+                "session_id": self.session_id,
+                "seq": self.sequence,
+            },
+        }
         self.send(payload)
         try:
-            op = json.loads(zlib_decompress(self.ws.recv()))["op"]
+            op = json.loads(self.zlib_decompress(self.ws.recv()))["op"]
             logger.debug(f"Connection resumed with code {op}")
             return op or True
         except json.JSONDecodeError:
@@ -529,13 +567,11 @@ class Gateway():
             print("Failed to resume connection")
             return 9
 
-
     def reconnect(self):
         """Try to resume session, if cant, create new one"""
         if not self.wait:
             with self.state_lock:
                 self.state = 2
-            logger.info("Trying to reconnect")
             print("Trying to reconnect")
         try:
             code = None
@@ -544,32 +580,38 @@ class Gateway():
                 code = self.resume()
             if code == 9 or code is None:
                 logger.debug("Restarting connection")
-                self.ws.close(timeout=0)   # this will stop receiver
-                time.sleep(1)   # so receiver ends before opening new socket
-                reset_inflator()   # otherwise decompression wont work
-                self.ready = False   # will receive new ready event
+                if self.ws:
+                    self.ws.close(timeout=0)  # this will stop receiver
+                time.sleep(1)  # so receiver ends before opening new socket
+                self.inflator = zlib.decompressobj()  # otherwise decompression wont work
+                self.ready = False  # will receive new ready event
                 self.ws = websocket.WebSocket()
                 self.connect_ws()
                 self.authenticate()
             self.wait = False
             # restarting threads
             if not self.receiver_thread.is_alive():
-                self.receiver_thread = threading.Thread(target=self.safe_function_wrapper, daemon=True, args=(self.receiver, ))
+                self.receiver_thread = threading.Thread(
+                    target=self.safe_function_wrapper,
+                    daemon=True,
+                    args=(self.receiver,),
+                )
                 self.receiver_thread.start()
             if not self.heartbeat_thread.is_alive():
-                self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
+                self.heartbeat_thread = threading.Thread(
+                    target=self.send_heartbeat, daemon=True
+                )
                 self.heartbeat_thread.start()
             with self.state_lock:
                 self.state = 1
             logger.info("Connection established")
             print("Connection established")
         except websocket._exceptions.WebSocketAddressException:
-            if not self.wait:   # if not running from wait_oline
+            if not self.wait:  # if not running from wait_oline
                 logger.warning("No internet connection")
                 print("No internet connection")
                 self.ws.close()
                 threading.Thread(target=self.wait_online, daemon=True, args=()).start()
-
 
     def wait_online(self):
         """Wait for network, try to reconnect every 5s"""
@@ -577,7 +619,6 @@ class Gateway():
         while self.run and self.wait:
             self.reconnect_requested = True
             time.sleep(5)
-
 
     def get_state(self):
         """
@@ -588,25 +629,35 @@ class Gateway():
         """
         return self.state
 
-
-    def update_presence(self, status, custom_status=None, custom_status_emoji=None, activities=None, afk=False):
+    def update_presence(
+        self,
+        status,
+        custom_status=None,
+        custom_status_emoji=None,
+        activities=None,
+        afk=False,
+    ):
         """Update client status. Statuses: 'online', 'idle', 'dnd', 'invisible', 'offline'"""
         if self.legacy:
-            return   # spacebar_fix - gateway returns error if this event is sent
+            return  # spacebar_fix - gateway returns error if this event is sent
 
         all_activities = []
         if custom_status:
-            all_activities.append({
-                "name": "Custom Status",
-                "type": 4,
-                "state": custom_status,
-            })
+            all_activities.append(
+                {
+                    "name": "Custom Status",
+                    "type": 4,
+                    "state": custom_status,
+                }
+            )
             if custom_status_emoji:
                 all_activities[0]["emoji"] = custom_status_emoji
         if activities:
             for activity in activities:
                 all_activities.append(activity)
-        print(f"Updating presence: status={status}, custom_status={custom_status}, activities={activities}, afk={afk}")
+        print(
+            f"Updating presence: status={status}, custom_status={custom_status}, activities={activities}, afk={afk}"
+        )
 
         payload = {
             "op": 3,
@@ -619,11 +670,19 @@ class Gateway():
         }
         self.send(payload)
         logger.debug("Updated presence")
-    
-
-
 
     def get_ready(self):
         """Return wether gateway processed entire READY event"""
         return self.ready
 
+    def zlib_decompress(self, data):
+        """Decompress zlib data, if it is not zlib compressed, return data instead"""
+        if len(data) < 4 or data[-4:] != ZLIB_SUFFIX:
+            return data
+        try:
+            return self.inflator.decompress(data)
+        except zlib.error as e:
+            logger.error(f"zlib error: {e}")
+            print(f"zlib error: {e}")
+            return None
+    

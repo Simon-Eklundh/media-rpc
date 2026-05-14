@@ -18,13 +18,9 @@ A Discord Rich Presence client that shows what you're watching on Jellyfin or li
 
 ## Runners
 
-### scripts
+### script
 
-Two scripts are included:
-
-**`media_rpc_local.py`** - Discord must be running on the same machine. Connects over the local IPC socket. Simpler setup, no extra token needed. This is the safer option.
-
-**`media_rpc_gateway.py`** - Connects via the Discord gateway as a user account. Can run on a server or NAS without Discord installed. Requires an additional `DISCORD_TOKEN` in your `.env`.
+media_rpc.py
 
 ### docker
 
@@ -44,12 +40,21 @@ https://hub.docker.com/repository/docker/simoneklundh/media-rpc
 - Library blacklist to hide specific Jellyfin libraries (cached for performance)
 - Auto-reconnect if Discord connection drops
 - Local cover cache to avoid redundant requests
+- Can optionally be ran without discord running
 
 ---
 
 ## Requirements
 
+### script version
+
 - Python 3.10+ (for mac this might require homebrew)
+
+### docker version
+
+- docker
+
+### both
 - A running [Jellyfin](https://jellyfin.org/) and/or [Audiobookshelf](https://www.audiobookshelf.org/) instance
 - A [Discord application](https://discord.com/developers/applications) with a Client ID
 - A reverse proxy (Caddy, Nginx, Apache, Traefik) with a public domain for ABS cover art - see [Cover Art Setup](#cover-art-setup)
