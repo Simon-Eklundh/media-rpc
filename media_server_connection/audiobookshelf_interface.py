@@ -106,8 +106,8 @@ class ABS_Server:
                 )
                 cover = self.get_itunes_poster(display_title, display_author)
 
-            start_ts = int(now - current_time)
-            end_ts = int(start_ts + dur)
+            start_ts = int((now - current_time) * 1000)
+            end_ts = int((now - current_time + dur) * 1000)
             abs_state_text = f"{display_author}" + (f" • {DEFAULT_AUDIOBOOKSHELF_SERVER_NAME}" if DEFAULT_AUDIOBOOKSHELF_SERVER_NAME else "")
             # logic for which client icon to show
             device_info = session.get("deviceInfo", {})
