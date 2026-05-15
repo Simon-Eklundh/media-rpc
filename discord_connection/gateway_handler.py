@@ -40,7 +40,9 @@ class DiscordGatewayHandler:
                 time.sleep(10)
 
     def sigint_handler(self, signum, frame):
+        print("SIGINT received, shutting down...")
         if self.gateway and self.gateway.get_state() == 1:
+            print("Disconnecting from gateway...")
             self.disconnect()
         sys.exit(0)
 
@@ -49,6 +51,7 @@ class DiscordGatewayHandler:
 
     def disconnect(self):
         if self.gateway:
+            print("Disconnecting from gateway...")
             try:
                 self.gateway.update_presence("online", activities=[], afk=False)
                 self.gateway.disconnect_ws()

@@ -80,6 +80,7 @@ services:
       - ABS_SERVER=https://books.domain.tld
       - ABS_API_TOKEN=apitokenhere
       - USE_CHAPTER_TITLE=true
+      - USE_CHAPTER_TIMESTAMPS=false
       - DEFAULT_JELLYFIN_SERVER_NAME= Custom Server Name
       - DEFAULT_AUDIOBOOKSHELF_SERVER_NAME= Custom Server Name
       - JELLYFIN_IGNORE_LIBRARIES=Library1,Library2,Library3
@@ -176,6 +177,8 @@ ABS_SERVER=https://abs.example.com
 ABS_API_TOKEN=YOUR_ABS_API_TOKEN
 # optional, defaults to true
 USE_CHAPTER_TITLE=true
+# optional, defaults to false
+USE_CHAPTER_TIMESTAMPS=false
 #optional, defaults to empty string
 DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name 
 #optional, defaults to empty string
