@@ -15,6 +15,7 @@ class ABS_Server:
         self.abs_state = {"last_api_time": 0, "last_position": None, "is_playing": False}
 
     def fetch_data(self):
+        session = None
         try:
             url = f"{self.server_url}/api/me/listening-sessions?itemsPerPage=1"
             res = requests.get(
@@ -71,8 +72,8 @@ class ABS_Server:
                     timeout=2,
                 )
                 item_details = item_resp.json() if item_resp.status_code == 200 else {}
-            except:
-                print(f"[ABS] Failed to fetch item details for {display_title}")
+            except Exception as e:
+                print(f"[ABS] Failed to fetch item details for {display_title}: {e}")
                 item_details = {}
 
             is_podcast = (
@@ -134,8 +135,9 @@ class ABS_Server:
                 "artist": display_author,
                 "name": display_title + " • " + display_author,
             }
-        except:
-            print(f"[ABS] Error processing session data for {session.get('displayTitle', 'Unknown')}")
+        except Exception as e:
+            title = session.get("displayTitle", "Unknown") if isinstance(session, dict) else "Unknown"
+            print(f"[ABS] Error processing session data for {title}: {e}")
             return None
         
     def get_chapter_name(self,item_details, current_time):
