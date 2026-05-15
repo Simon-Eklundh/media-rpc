@@ -1,0 +1,85 @@
+import os
+import signal
+import time
+from dotenv import load_dotenv
+
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(env_path)
+
+
+from cache_handler import load_caches
+from discord_connection.discord_interface import DiscordHandler
+from media_server_connection.media_server_interface import MediaServerInterface
+
+discord_handler = None
+
+mediaServerInterface = None
+
+
+def startup_checks():
+    global discord_handler, mediaServerInterface
+    discord_handler = DiscordHandler()
+    discord_handler.discord_connector_startup_check()
+    mediaServerInterface = MediaServerInterface()
+    signal.signal(signal.SIGINT, discord_handler.sigint_handler)
+
+
+def run_loop():
+    last_printed = None
+    activity_key = None
+    while True:
+        if not discord_handler.is_connected():
+            print("Connection lost. Reconnecting...")
+            try:
+                discord_handler.disconnect()
+            except:
+                print("Error during disconnect, continuing with reconnect...")
+                pass
+            discord_handler.connect()
+            last_printed = None  # force presence resend after reconnect
+        data = mediaServerInterface.fetch_data()
+    
+        if data:
+            small_icon = data["client_image"]
+            activity_key = (data["details"], data["state"])
+            if activity_key == last_printed:
+                time.sleep(15)
+                continue            
+
+            print(
+                f"\n[{data.get('text', 'RPC')}] {data['details']} — {data['state']}"
+            )
+            last_printed = activity_key
+
+            timestamps = {"start": data["start"], "end": data["end"]}
+            activity = {
+                "name": data["name"],
+                "details": data["details"],
+                "state": data["state"],
+                "assets": {
+                    "large_image": data["cover"],
+                    "large_text": data["text"],
+                    "small_image": small_icon,
+                    "small_text": "Playing",
+                },
+                "type": data["type"],
+                "timestamps": timestamps,
+            }
+            discord_handler.update_presence(activity)
+        else:
+            if last_printed is not None:
+                print("\nNo data")
+                last_printed = None
+                discord_handler.clear_presence()
+        time.sleep(15)
+
+
+def main():
+    startup_checks()
+    load_caches()
+    print("starting media rpc server")
+    run_loop()
+
+
+if __name__ == "__main__":
+    main()

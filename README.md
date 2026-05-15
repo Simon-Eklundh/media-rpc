@@ -18,13 +18,9 @@ A Discord Rich Presence client that shows what you're watching on Jellyfin or li
 
 ## Runners
 
-### scripts
+### script
 
-Two scripts are included:
-
-**`media_rpc_local.py`** - Discord must be running on the same machine. Connects over the local IPC socket. Simpler setup, no extra token needed. This is the safer option.
-
-**`media_rpc_gateway.py`** - Connects via the Discord gateway as a user account. Can run on a server or NAS without Discord installed. Requires an additional `DISCORD_TOKEN` in your `.env`.
+media_rpc.py
 
 ### docker
 
@@ -44,12 +40,21 @@ https://hub.docker.com/repository/docker/simoneklundh/media-rpc
 - Library blacklist to hide specific Jellyfin libraries (cached for performance)
 - Auto-reconnect if Discord connection drops
 - Local cover cache to avoid redundant requests
+- Can optionally be ran without discord running
 
 ---
 
 ## Requirements
 
+### script version
+
 - Python 3.10+ (for mac this might require homebrew)
+
+### docker version
+
+- docker
+
+### both
 - A running [Jellyfin](https://jellyfin.org/) and/or [Audiobookshelf](https://www.audiobookshelf.org/) instance
 - A [Discord application](https://discord.com/developers/applications) with a Client ID
 - A reverse proxy (Caddy, Nginx, Apache, Traefik) with a public domain for ABS cover art - see [Cover Art Setup](#cover-art-setup)
@@ -62,7 +67,7 @@ https://hub.docker.com/repository/docker/simoneklundh/media-rpc
 ```yaml
 services:
   media-rpc:
-    image: simoneklundh/media-rpc
+    image: simoneklundh/media-rpc:2
     container_name: media-rpc
     restart: unless-stopped
     environment:
@@ -78,6 +83,7 @@ services:
       - DEFAULT_JELLYFIN_SERVER_NAME= Custom Server Name
       - DEFAULT_AUDIOBOOKSHELF_SERVER_NAME= Custom Server Name
       - JELLYFIN_IGNORE_LIBRARIES=Library1,Library2,Library3
+      - USE_GATEWAY=true
 ```
 [How to get the variables](#Configuration)  
 
@@ -106,16 +112,14 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 **3. Install dependencies:**
 
 ```bash
-# if you want to use the gateway version
-pip install -r gateway_requirements.txt
-# if you want the normal rpc version
-pip install -r local_requirements.txt
+pip install -r requirements.txt
+
 ```
 
 **4. Configure the script:**
 
 ```bash
-# discord (DISCORD_TOKEN is only required for media_rpc_gateway.py)
+# discord (DISCORD_TOKEN is only required for the gateway version)
 DISCORD_TOKEN=YOUR_DISCORD_TOKEN
 DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
 # jellyfin
@@ -134,14 +138,13 @@ DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name
 DEFAULT_AUDIOBOOKSHELF_SERVER_NAME=audiobookshelf_server_name 
 #optional, defaults to empty list
 JELLYFIN_IGNORE_LIBRARIES=library1,library2
+# true => use gateway, false => use rpc (requires discord running on your computer)
+# defaults to false
+USE_GATEWAY=true
 ```
 **5. Run media-rpc:**
 ```bash
-# local runner - Discord must be running on this machine
-python media_rpc_local.py
-
-# gateway runner - runs anywhere, requires DISCORD_TOKEN
-python media_rpc_gateway.py
+python media_rpc.py
 ```
 
 ## global version (not recommended)
@@ -154,10 +157,7 @@ cd media-rpc
 
 **2. Install dependencies:**
 ```bash
-# if you want to use the gateway version
-pip install -r gateway_requirements.txt
-# if you want the normal rpc version
-pip install -r local_requirements.txt
+pip install -r requirements.txt
 ```
 
 **3. Configure the script:** Create a new file named `.env` in the same directory as the script and fill in your details:
@@ -182,15 +182,13 @@ DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name
 DEFAULT_AUDIOBOOKSHELF_SERVER_NAME=audiobookshelf_server_name 
 #optional, defaults to empty list
 JELLYFIN_IGNORE_LIBRARIES=library1,library2
+# defaults to false. true => use the gateway, no discord client needed. requires DISCORD_TOKEN
+USE_GATEWAY=true
 ```
 
 **4. Run manually to test:**
 ```bash
-# local runner - Discord must be running on this machine
-python3 media_rpc_local.py
-
-# gateway runner - runs anywhere, requires DISCORD_TOKEN
-python3 media_rpc_gateway.py
+python3 media_rpc.py
 ```
 ---
 
@@ -240,7 +238,9 @@ JELLYFIN_IGNORE_LIBRARIES = ["Bollywood", "Kids"]
 ```compose
 JELLYFIN_IGNORE_LIBRARIES=Bollywood,Kids
 ```
-
+### Gateway
+To use the discord gateway instead of rpc, add
+USE_GATEWAY=true and the Discord Token to the .env
 ---
 
 ## Cover Art Setup
