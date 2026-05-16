@@ -26,6 +26,7 @@ def startup_checks():
 
 def run_loop():
     last_printed = None
+    last_start_time = None
     activity_key = None
     while True:
         if not discord_handler.is_connected():
@@ -36,13 +37,17 @@ def run_loop():
                 print("Error during disconnect, continuing with reconnect...")
                 pass
             discord_handler.connect()
-            last_printed = None  # force presence resend after reconnect
+            last_printed = None
+            last_start_time = None
         data = mediaServerInterface.fetch_data()
     
         if data:
             small_icon = data["client_image"]
             activity_key = (data["details"], data["state"])
-            if activity_key == last_printed:
+            has_seeked = False
+            if last_start_time is not None and abs(data["start"] - last_start_time) > 5000:
+                has_seeked = True
+            if activity_key == last_printed and not has_seeked:
                 time.sleep(15)
                 continue            
 
@@ -50,6 +55,7 @@ def run_loop():
                 f"\n[{data.get('text', 'RPC')}] {data['details']} — {data['state']}"
             )
             last_printed = activity_key
+            last_start_time = data["start"]
 
             timestamps = {"start": data["start"], "end": data["end"]}
             activity = {
@@ -70,6 +76,7 @@ def run_loop():
             if last_printed is not None:
                 print("\nNo data")
                 last_printed = None
+                last_start_time = None
                 discord_handler.clear_presence()
         time.sleep(15)
 
