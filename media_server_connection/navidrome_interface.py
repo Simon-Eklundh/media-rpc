@@ -27,10 +27,8 @@ class NavidromeServer:
                 f"{self.server_url}/rest/getNowPlaying?u={self.username}&t={md5_hash}&s={self.salt}&f=json&v=1.16.1&c=media-rpc",
                 timeout=1
             )
-            print(f"Fetching data from Navidrome server, response code: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
-                print(data)
                 now_playing = data["subsonic-response"].get("nowPlaying", {})
                 entries = now_playing.get("entry", [])
                 entry = next(
@@ -49,13 +47,15 @@ class NavidromeServer:
                     duration = entry.get("duration", 0)
                     prog = positionMs / 1000  # seconds elapsed into the track
                     year = entry.get("year", "")
-                    state = f"{year}" if year else "" + (
+                    state = (f"{year}" if year else "") + (
                             f" • {DEFAULT_NAVIDROME_SERVER_NAME}" if DEFAULT_NAVIDROME_SERVER_NAME else ""
                         )
+                    print(DEFAULT_NAVIDROME_SERVER_NAME)
+                    print("state:")
+                    print(state)
                     cover = entry.get("coverArt") 
                     url = self.cover_art_url(cover, size=300)
-                    print(f"Now playing on Navidrome: {title} by {artist}, position: {positionMs}ms, duration: {duration}s")
-                    print(f"positionms in seconds: {positionMs / 1000}")
+                    print(f"Now playing on Navidrome: {title} by {artist}")
                     return {
                         "type": 2,
                         "status": "online",
