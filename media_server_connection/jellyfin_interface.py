@@ -113,7 +113,7 @@ class JellyfinServer:
                 case "AFinity":
                     small_icon = "https://raw.githubusercontent.com/MakD/AFinity/refs/heads/master/screenshots/Logo/ic_launcher_round_mdpi.webp"
                 case "Streamyfin":
-                    small_icon = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/streamyfin.webp"
+                    small_icon = "https://raw.githubusercontent.com/streamyfin/streamyfin/refs/heads/develop/assets/images/icon-ios-plain.png"
                 case "Jellify":
                     small_icon = "https://i.ibb.co/zVCxQFJN/jellify.png"
                 case "Pelagica":
