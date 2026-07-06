@@ -39,19 +39,28 @@ class MediaServerInterface:
     def fetch_data(self):
         if self.servers.get(self.JELLYFIN_SERVER):
             server = self.servers[self.JELLYFIN_SERVER]
-            data = server.fetch_data()
-            if data:
-                return data
+            try:
+                data = server.fetch_data()
+                if data:
+                    return data
+            except Exception as e:
+                print(f"Error fetching data from Jellyfin server: {e}")
         if self.servers.get(self.ABS_SERVER):
             server = self.servers[self.ABS_SERVER]
-            data = server.fetch_data()
-            if data:
-                return data
+            try:
+                data = server.fetch_data()
+                if data:
+                    return data
+            except Exception as e:
+                print(f"Error fetching data from Audiobookshelf server: {e}")
         if self.servers.get(self.NAVIDROME_SERVER):
             server = self.servers[self.NAVIDROME_SERVER]
-            data = server.fetch_data()
-            if data:
-                return data
+            try:
+                data = server.fetch_data()
+                if data:
+                    return data
+            except Exception as e:
+                print(f"Error fetching data from Navidrome server: {e}")
         return None
 
 

@@ -8,7 +8,7 @@ from cache_handler import get_library_cache_key, get_poster_cache_key, save_libr
 
 
 DEFAULT_JELLYFIN_SERVER_NAME = os.getenv("DEFAULT_JELLYFIN_SERVER_NAME", default="")
-
+GET_SHOW_YEAR = os.getenv("GET_SHOW_YEAR", default="False").lower() == "true"
 
 class JellyfinServer:
     def __init__(self, server_url, api_key, user_id, ignore_libraries, tmdb_api_key):
@@ -18,11 +18,28 @@ class JellyfinServer:
         self.ignore_libraries = ignore_libraries
         self.tmdb_api_key = tmdb_api_key
 
-        
+    def get_show_year(self, base_url, series_id, api_key, user_id):
+        try:
+            url = f"{base_url}/Items"
+            params = {"userId": user_id, "ids": series_id}
+            headers = {"Authorization": f'MediaBrowser Token={api_key}'}
+            response = requests.get(url, params=params, headers=headers, timeout=2)
+            if response.status_code == 200:
+                data = response.json().get("Items", [None])[0] # Assuming the first item is the series (which it will be because we ask for just one show)
+                year = data.get("ProductionYear")
+                return year
+            else:
+                print(f"[DEBUG] Failed to fetch show year: {response.status_code}")
+                return None
+        except Exception as e:
+            print(f"[DEBUG] Error fetching show year: {e}")
+            return None
+    
+    
     def fetch_data(self):
         try:
             res = requests.get(
-                self.server_url, headers={"X-Emby-Token": self.api_key}, timeout=1
+                self.server_url, headers={"Authorization": f'MediaBrowser Token={self.api_key}'}, timeout=1
             ).json()
             if not res:
                 return None
@@ -47,6 +64,8 @@ class JellyfinServer:
             if item.get("SeriesId"):
                 item_id = item.get("SeriesId")
                 artist_name = item.get("SeriesName")
+                if GET_SHOW_YEAR:
+                    year = self.get_show_year(base_url, item_id, self.api_key, self.user_id)
             if item.get("ArtistItems"):
                 if item.get("ArtistItems")[0].get("Id"):
                     item_id = item.get("ArtistItems")[0].get("Id")
@@ -63,7 +82,7 @@ class JellyfinServer:
                         parents_resp = requests.get(
                             anc_url,
                             params={"userId": user_id},
-                            headers={"X-Emby-Token": self.api_key},
+                            headers={"Authorization": f'MediaBrowser Token={self.api_key}'},
                             timeout=9,
                         )
 
@@ -94,9 +113,11 @@ class JellyfinServer:
 
             prog = session["PlayState"].get("PositionTicks", 0) / 10000000
             dur = item.get("RunTimeTicks", 0) / 10000000
-            year = item.get("ProductionYear")
+            if not GET_SHOW_YEAR:
+                year = item.get("ProductionYear")
             series = item.get("SeriesName")
-            state_text = (f"{series} ({year})" if series else f"{year}") + (
+            year_text = f"({year})" if year else ""
+            state_text = (f"{series} {year_text} " if series else year_text) + (
                 f" • {DEFAULT_JELLYFIN_SERVER_NAME}"
                 if DEFAULT_JELLYFIN_SERVER_NAME
                 else ""
