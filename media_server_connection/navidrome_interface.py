@@ -16,7 +16,7 @@ class NavidromeServer:
         self.username = username
         self.password = password
         self.salt = salt
-        self.last_position = 0
+
     def _generate_md5_hash(self, text):
         return hashlib.md5(text.encode("utf-8")).hexdigest()
 
@@ -31,29 +31,29 @@ class NavidromeServer:
                 data = response.json()
                 now_playing = data["subsonic-response"].get("nowPlaying", {})
                 entries = now_playing.get("entry", [])
-                entry = next(
-                    (e for e in entries if e.get("username") == self.username),
-                    None,
+                # One entry per player; the server drops "playing" entries as soon
+                # as the track would have ended, so anything not paused is live.
+                candidates = [
+                    e for e in entries
+                    if e.get("username") == self.username and e.get("state") != "paused"
+                ]
+                entry = min(
+                    candidates,
+                    key=lambda e: (e.get("minutesAgo", 0), -e.get("positionMs", 0)),
+                    default=None,
                 )
                 if entry:
-                    if entry.get("minutesAgo") is not None and entry.get("minutesAgo") > 1:
-                        if self.last_position == entry.get("positionMs", 0):
-                            print(f"Now playing entry is older than 1 minute with no changes, ignoring: {entry}")
-                            return None
-                    self.last_position = entry.get("positionMs", 0)
                     title = entry.get("title")
                     artist = entry.get("artist")
                     positionMs = entry.get("positionMs", 0)
                     duration = entry.get("duration", 0)
+                    rate = entry.get("playbackRate") or 1.0
                     prog = positionMs / 1000  # seconds elapsed into the track
                     year = entry.get("year", "")
                     state = (f"{year}" if year else "") + (
                             f" • {DEFAULT_NAVIDROME_SERVER_NAME}" if DEFAULT_NAVIDROME_SERVER_NAME else ""
                         )
-                    print(DEFAULT_NAVIDROME_SERVER_NAME)
-                    print("state:")
-                    print(state)
-                    cover = entry.get("coverArt") 
+                    cover = entry.get("coverArt")
                     url = self.cover_art_url(cover, size=300)
                     print(f"Now playing on Navidrome: {title} by {artist}")
                     return {
@@ -63,11 +63,11 @@ class NavidromeServer:
                         "state": state,
                         "artist": artist,
                         "text": artist,
-                        "start": int((time.time() - prog) * 1000),
-                        "end": int((time.time() - prog + duration) * 1000),
+                        "start": int((time.time() - prog / rate) * 1000),
+                        "end": int((time.time() + (duration - prog) / rate) * 1000),
                         "cover": url,
                         "name": title + " • " + artist,
-                        "client_image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/navidrome.png" # TODO: this should be a client icon, but I'm not done yet. based on playerName 
+                        "client_image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/navidrome.png" # TODO: this should be a client icon, but I'm not done yet. based on playerName
                     }
                 return None
             else:
