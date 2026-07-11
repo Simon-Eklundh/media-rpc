@@ -69,6 +69,9 @@ class DiscordGatewayHandler:
                 except Exception as e:
                     print(f"Error clearing gateway presence: {e}")
                     return
+            print("No activity to update, and gateway is not connected.")
+            return
+        if not (self.gateway and self.gateway.get_state() == 1): return
         small_image = activity["assets"]["small_image"]
         if small_image and small_image.startswith("http"):
             activity["assets"]["small_image"] = self.resolve_mp_url(small_image)
