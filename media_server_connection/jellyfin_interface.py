@@ -64,8 +64,10 @@ class JellyfinServer:
             if item.get("SeriesId"):
                 item_id = item.get("SeriesId")
                 artist_name = item.get("SeriesName")
-                if GET_SHOW_YEAR:
+                if GET_SHOW_YEAR and item.get("Type") == "Episode":
                     year = self.get_show_year(base_url, item_id, self.api_key, self.user_id)
+            if  item.get("Type") == "Movie":
+                year = item.get("ProductionYear")
             if item.get("ArtistItems"):
                 if item.get("ArtistItems")[0].get("Id"):
                     item_id = item.get("ArtistItems")[0].get("Id")
@@ -116,7 +118,7 @@ class JellyfinServer:
             if not GET_SHOW_YEAR:
                 year = item.get("ProductionYear")
             series = item.get("SeriesName")
-            year_text = f"({year})" if year else ""
+            year_text = (f"({year})" if series else f"{year}") if year else ""
             state_text = (f"{series} {year_text} " if series else year_text) + (
                 f" • {DEFAULT_JELLYFIN_SERVER_NAME}"
                 if DEFAULT_JELLYFIN_SERVER_NAME
