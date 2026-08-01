@@ -573,13 +573,26 @@ class Gateway:
             with self.state_lock:
                 self.state = 1
             print("Connection established after reconnect")
-            self.update_presence(status="idle", activities=[], afk=True)     
-            self.update_presence('idle', activities=self.my_status["activities"], afk=True)  # update presence after reconnect
+            self.update_presence('idle', activities=self.my_status.get("activities", []), afk=True)  # update presence after reconnect
         except websocket._exceptions.WebSocketAddressException:
             if not self.wait:  # if not running from wait_oline
                 print("No internet connection")
                 self.ws.close()
                 threading.Thread(target=self.wait_online, daemon=True, args=()).start()
+        except Exception as e:
+            # Any other failure here (timeouts, connection resets, TLS errors, etc.)
+            # would otherwise kill this thread silently and leave nothing running
+            # that could ever trigger another reconnect attempt.
+            print(f"Reconnect attempt failed: {e}")
+            if self.ws:
+                try:
+                    self.ws.close()
+                except Exception:
+                    pass
+            with self.state_lock:
+                self.state = 0
+            time.sleep(2)
+            self.reconnect_requested = True
 
     def wait_online(self):
         """Wait for network, try to reconnect every 5s"""
