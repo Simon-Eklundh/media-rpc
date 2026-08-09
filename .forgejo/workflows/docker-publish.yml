@@ -25,7 +25,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: DOCKERHUB_USERNAME/media-rpc
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/media-rpc
           tags: |
             type=raw,value=2,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
