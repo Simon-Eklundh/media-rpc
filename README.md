@@ -76,6 +76,7 @@ services:
       - DISCORD_TOKEN=tokenhere
       - JELLYFIN_SERVER=https://jellyfin.domain.tld/Sessions
       - JELLYFIN_API_KEY=apikeyhere
+      - USE_SERIES_IMAGE=false
       - JELLYFIN_USER_ID=useridhere
       - TMDB_API_KEY=api_key_here
       - ABS_SERVER=https://books.domain.tld
@@ -135,6 +136,7 @@ DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
 JELLYFIN_SERVER=https://jellyfin.example.com/Sessions
 JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY
 JELLYFIN_USER_ID=YOUR_JELLYFIN_USER_ID
+USE_SERIES_IMAGE=false
 TMDB_API_KEY=YOUR_TMDB_API_KEY
 # audiobookshelf
 ABS_SERVER=https://abs.example.com
@@ -187,6 +189,7 @@ DISCORD_CLIENT_ID=YOUR_DISCORD_CLIENT_ID
 JELLYFIN_SERVER=https://jellyfin.example.com/Sessions
 JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY
 JELLYFIN_USER_ID=YOUR_JELLYFIN_USER_ID
+USE_SERIES_IMAGE=false
 TMDB_API_KEY=YOUR_TMDB_API_KEY
 # audiobookshelf
 ABS_SERVER=https://abs.example.com
@@ -220,6 +223,10 @@ python3 media_rpc.py
 ---
 
 ## Configuration
+
+### USE_SERIES_IMAGE
+
+set this to true if you want to use a series image instead of episode image
 
 ### Discord Application ID
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
