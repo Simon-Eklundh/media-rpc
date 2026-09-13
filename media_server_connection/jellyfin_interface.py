@@ -9,6 +9,7 @@ from cache_handler import get_library_cache_key, get_poster_cache_key, save_libr
 
 DEFAULT_JELLYFIN_SERVER_NAME = os.getenv("DEFAULT_JELLYFIN_SERVER_NAME", default="")
 GET_SHOW_YEAR = os.getenv("GET_SHOW_YEAR", default="False").lower() == "true"
+USE_SERIES_IMAGE = os.getenv("USE_SERIES_IMAGE", default="False").lower() == "true"
 
 class JellyfinServer:
     def __init__(self, server_url, api_key, user_id, ignore_libraries, tmdb_api_key):
@@ -158,6 +159,10 @@ class JellyfinServer:
             if item.get("Type") == "Audio":
                 discord_type = 2
                 status = "online"
+            item_id_for_image = item.get("Id")
+            if USE_SERIES_IMAGE and item.get("SeriesId"):
+                item_id_for_image = item.get("SeriesId")
+
             return {
                 "type": discord_type,
                 "status": status,
@@ -167,7 +172,7 @@ class JellyfinServer:
                 "end": int((time.time() - prog + dur) * 1000),
                 "cover": self.get_jellyfin_cover(
                     base_url,
-                    item.get("Id"),
+                    item_id_for_image,
                     self.api_key,
                     series if series else title,
                     year,
