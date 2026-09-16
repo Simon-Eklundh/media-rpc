@@ -398,3 +398,6 @@ Every 15 seconds, the script polls your media servers for active sessions. If so
 **Navidrome not showing**
 - Assumed Paused sessions are intentionally ignored
 - make sure your server is reachable and passwords are correct
+
+**IPV6 not working well with docker**
+- read the ipv6 docker documentation and verify you've got it correctly https://docs.docker.com/engine/daemon/ipv6/
