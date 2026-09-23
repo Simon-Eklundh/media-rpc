@@ -63,6 +63,7 @@ class JellyfinServer:
             title = item.get("Name")
             artist_name = DEFAULT_JELLYFIN_SERVER_NAME  # can be changed
             item_id = item.get("Id")
+            year = item.get("PremiereDate")
             if item.get("SeriesId"):
                 item_id = item.get("SeriesId")
                 artist_name = item.get("SeriesName")
