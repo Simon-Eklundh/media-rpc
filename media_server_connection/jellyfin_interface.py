@@ -10,6 +10,7 @@ from cache_handler import get_library_cache_key, get_poster_cache_key, save_libr
 DEFAULT_JELLYFIN_SERVER_NAME = os.getenv("DEFAULT_JELLYFIN_SERVER_NAME", default="")
 GET_SHOW_YEAR = os.getenv("GET_SHOW_YEAR", default="False").lower() == "true"
 USE_SERIES_IMAGE = os.getenv("USE_SERIES_IMAGE", default="False").lower() == "true"
+USE_TMDB_IMAGE = os.getenv("USE_TMDB_IMAGE", default="False").lower() == "true"
 
 class JellyfinServer:
     def __init__(self, server_url, api_key, user_id, ignore_libraries, tmdb_api_key):
@@ -62,6 +63,7 @@ class JellyfinServer:
             title = item.get("Name")
             artist_name = DEFAULT_JELLYFIN_SERVER_NAME  # can be changed
             item_id = item.get("Id")
+            year = item.get("PremiereDate")
             if item.get("SeriesId"):
                 item_id = item.get("SeriesId")
                 artist_name = item.get("SeriesName")
@@ -194,6 +196,9 @@ class JellyfinServer:
         poster_cache_key = get_poster_cache_key(cache_key)
         if poster_cache_key:
             return poster_cache_key
+
+        if USE_TMDB_IMAGE:
+            return self.get_tmdb_poster(title, year, item_type)
         try:
             cover_url = f"{base_url}/Items/{item_id}/Images/Primary?fillHeight=500&fillWidth=500&quality=96&api_key={api_key}"
             resp = requests.head(cover_url, timeout=2)
