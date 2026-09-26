@@ -11,8 +11,14 @@ DEFAULT_JELLYFIN_SERVER_NAME = os.getenv("DEFAULT_JELLYFIN_SERVER_NAME", default
 GET_SHOW_YEAR = os.getenv("GET_SHOW_YEAR", default="False").lower() == "true"
 USE_SERIES_IMAGE = os.getenv("USE_SERIES_IMAGE", default="False").lower() == "true"
 USE_TMDB_IMAGE = os.getenv("USE_TMDB_IMAGE", default="False").lower() == "true"
+FORCE_SHOW_EPISODE_INDEX = os.getenv("FORCE_SHOW_EPISODE_INDEX", default="false").lower() == "true"
+SHOW_TITLE_IN_TOP = os.getenv("SHOW_TITLE_IN_TOP", default="false").lower() == "true"
+
+show_to_year = {}
 
 class JellyfinServer:
+    
+
     def __init__(self, server_url, api_key, user_id, ignore_libraries, tmdb_api_key):
         self.server_url = server_url
         self.api_key = api_key
@@ -21,6 +27,9 @@ class JellyfinServer:
         self.tmdb_api_key = tmdb_api_key
 
     def get_show_year(self, base_url, series_id, api_key, user_id):
+        year = show_to_year.get(series_id)
+        if year is not None: 
+            return year
         try:
             url = f"{base_url}/Items"
             params = {"userId": user_id, "ids": series_id}
@@ -29,6 +38,7 @@ class JellyfinServer:
             if response.status_code == 200:
                 data = response.json().get("Items", [None])[0] # Assuming the first item is the series (which it will be because we ask for just one show)
                 year = data.get("ProductionYear")
+                show_to_year[series_id] = year
                 return year
             else:
                 print(f"[DEBUG] Failed to fetch show year: {response.status_code}")
@@ -67,6 +77,11 @@ class JellyfinServer:
             if item.get("SeriesId"):
                 item_id = item.get("SeriesId")
                 artist_name = item.get("SeriesName")
+                if FORCE_SHOW_EPISODE_INDEX:
+                    season_number = f"{item.get("ParentIndexNumber"):02}" 
+                    episodeNumber = f"{item.get("IndexNumber"):02}" 
+                    prefix = 'S'+season_number+'E'+episodeNumber
+                    title_with_prefix = prefix + ' - ' + title
                 if GET_SHOW_YEAR and item.get("Type") == "Episode":
                     year = self.get_show_year(base_url, item_id, self.api_key, self.user_id)
             if  item.get("Type") == "Movie":
@@ -75,6 +90,7 @@ class JellyfinServer:
                 if item.get("ArtistItems")[0].get("Id"):
                     item_id = item.get("ArtistItems")[0].get("Id")
                     artist_name = item.get("AlbumArtist")
+
             if self.ignore_libraries:
                 key = get_library_cache_key(item_id)
                 if key is not None:
@@ -118,7 +134,7 @@ class JellyfinServer:
 
             prog = session["PlayState"].get("PositionTicks", 0) / 10000000
             dur = item.get("RunTimeTicks", 0) / 10000000
-            if not GET_SHOW_YEAR:
+            if not GET_SHOW_YEAR or item.get("Type") == 'Audio':
                 year = item.get("ProductionYear")
             series = item.get("SeriesName")
             year_text = (f"({year})" if series else f"{year}") if year else ""
@@ -127,6 +143,11 @@ class JellyfinServer:
                 if DEFAULT_JELLYFIN_SERVER_NAME
                 else ""
             )
+            name = title + " • " + artist_name
+            if SHOW_TITLE_IN_TOP and item.get("SeriesName"):
+                name = item.get("SeriesName")
+
+
 
             # Logic to get client icon in the little area in discord activity details
             client = session.get("Client")
@@ -168,7 +189,7 @@ class JellyfinServer:
             return {
                 "type": discord_type,
                 "status": status,
-                "details": title,
+                "details":title_with_prefix if FORCE_SHOW_EPISODE_INDEX and item.get("SeriesId") else title,
                 "state": state_text,
                 "start": int((time.time() - prog) * 1000),
                 "end": int((time.time() - prog + dur) * 1000),
@@ -184,7 +205,7 @@ class JellyfinServer:
                 "client_image": small_icon,
                 "client": client,
                 "artist": artist_name,
-                "name": title + " • " + artist_name,
+                "name": name ,
             }
         except Exception as e:
             print(f"[DEBUG] Failed to fetch data from Jellyfin server: {e}")

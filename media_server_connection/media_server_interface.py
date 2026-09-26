@@ -66,7 +66,7 @@ class MediaServerInterface:
 
     def media_servers_startup_check(self):
         if not self.JELLYFIN_SERVER and not self.ABS_SERVER and not self.NAVIDROME_SERVER:
-            raise EnvironmentError("No media server configured. Please set JELLYFIN_SERVER, ABS_SERVER, and/or NAVIDROME_SERVER_URL in your .env file.")
+            raise EnvironmentError("No media server configured. Please set JELLYFIN_SERVER, ABS_SERVER, and/or NAVIDROME_SERVER in your .env file.")
         if self.JELLYFIN_SERVER and (not self.JELLYFIN_API_KEY or not self.JELLYFIN_USER_ID):
             raise EnvironmentError("Jellyfin server configured but missing JELLYFIN_API_KEY and/or JELLYFIN_USER_ID in .env file.")
         if self.ABS_SERVER and not self.ABS_API_TOKEN:

@@ -86,6 +86,10 @@ services:
       - DEFAULT_JELLYFIN_SERVER_NAME= Custom Server Name
       - DEFAULT_AUDIOBOOKSHELF_SERVER_NAME= Custom Server Name
       - JELLYFIN_IGNORE_LIBRARIES=Library1,Library2,Library3
+      - USE_TMDB_IMAGE=false
+      - GET_SHOW_YEAR=false
+      - FORCE_SHOW_EPISODE_INDEX=false
+      - SHOW_TITLE_IN_TOP=false
       # Navidrome variables, only necessary if using Navidrome, not needed for Jellyfin or AudioBookShelf
       - NAVIDROME_USERNAME=admin
       - NAVIDROME_PASSWORD=adminpassword
@@ -141,14 +145,24 @@ TMDB_API_KEY=YOUR_TMDB_API_KEY
 # audiobookshelf
 ABS_SERVER=https://abs.example.com
 ABS_API_TOKEN=YOUR_ABS_API_TOKEN
-# optional, defaults to true
+# optional, defaults to false
 USE_CHAPTER_TITLE=true
+# optional, defaults to false
+USE_CHAPTER_TIMESTAMPS=false
 #optional, defaults to empty string
-DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name 
+DEFAULT_JELLYFIN_SERVER_NAME=jellyfin_server_name 
 #optional, defaults to empty string
 DEFAULT_AUDIOBOOKSHELF_SERVER_NAME=audiobookshelf_server_name 
 #optional, defaults to empty list
 JELLYFIN_IGNORE_LIBRARIES=library1,library2
+# optional, defaults to false
+USE_TMDB_IMAGE=false
+# optional, defaults to false
+GET_SHOW_YEAR=false
+# optional, defaults to false
+FORCE_SHOW_EPISODE_INDEX=false
+# optional, defaults to false
+SHOW_TITLE_IN_TOP=false
 # Navidrome variables, only necessary if using Navidrome, not needed for Jellyfin or AudioBookShelf
 NAVIDROME_USERNAME=admin
 NAVIDROME_PASSWORD=adminpassword
@@ -194,16 +208,24 @@ TMDB_API_KEY=YOUR_TMDB_API_KEY
 # audiobookshelf
 ABS_SERVER=https://abs.example.com
 ABS_API_TOKEN=YOUR_ABS_API_TOKEN
-# optional, defaults to true
+# optional, defaults to false
 USE_CHAPTER_TITLE=true
 # optional, defaults to false
 USE_CHAPTER_TIMESTAMPS=false
 #optional, defaults to empty string
-DEFAULT_JELLYFIN_SERVER_NAME=jellfin_server_name 
+DEFAULT_JELLYFIN_SERVER_NAME=jellyfin_server_name 
 #optional, defaults to empty string
 DEFAULT_AUDIOBOOKSHELF_SERVER_NAME=audiobookshelf_server_name 
 #optional, defaults to empty list
 JELLYFIN_IGNORE_LIBRARIES=library1,library2
+# optional, defaults to false
+USE_TMDB_IMAGE=false
+# optional, defaults to false
+GET_SHOW_YEAR=false
+# optional, defaults to false
+FORCE_SHOW_EPISODE_INDEX=false
+# optional, defaults to false
+SHOW_TITLE_IN_TOP=false
 # Navidrome variables, only necessary if using Navidrome, not needed for Jellyfin or AudioBookShelf
 NAVIDROME_USERNAME=admin
 NAVIDROME_PASSWORD=adminpassword
@@ -227,6 +249,26 @@ python3 media_rpc.py
 ### USE_SERIES_IMAGE
 
 set this to true if you want to use a series image instead of episode image
+
+### USE_TMDB_IMAGE
+
+set this to true if you want to use TMDB posters instead of the Jellyfin images
+
+### GET_SHOW_YEAR
+
+set this to true if you want to show the year the series started instead of the episode's year
+
+### FORCE_SHOW_EPISODE_INDEX
+
+set this to true if you want episode titles prefixed with season and episode number, e.g. `S01E05 - Title`
+
+### SHOW_TITLE_IN_TOP
+
+set this to true if you want the series name in the top line instead of the episode title
+
+### USE_CHAPTER_TIMESTAMPS
+
+set this to true if you want the Audiobookshelf progress bar to show the current chapter instead of the whole book
 
 ### Discord Application ID
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
@@ -260,7 +302,7 @@ To ensure Discord only shows what *you* are watching and ignores other users on 
 1. In Audiobookshelf, go to **Settings → Users**
 2. Click your user and copy the **API Token**
 
-### TMDB API Key (optional, Jellyfin cover fallback)
+### TMDB API Key (required for Jellyfin)
 1. Create an account at [themoviedb.org](https://www.themoviedb.org/)
 2. Go to **Settings → API** and request a key
 
